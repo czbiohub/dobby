@@ -16,5 +16,6 @@ setup(
     packages=['dobby'],
     install_requires=required,
     long_description='See ' + 'https://github.com/czbiohub/dobby',
-    license='MIT'
+    license='MIT',
+    entry_points={"console_scripts": ['dobby = dobby.cli:cli']}
 )
