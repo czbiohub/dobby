@@ -194,4 +194,7 @@ Use your Client ID and Secret to authenticate in `-headless` mode for `google-dr
 
 ```
 google-drive-ocamlfuse ~/googledrive -headless -id 1234-asdf.apps.googleusercontent.com -secret asdfasdfasdf
+Please, open the following URL in a web browser: https://accounts.google.com/o/oauth2/auth?client_id=REDACTED
+Please enter the verification code: REDACTED
+Access token retrieved correctly.
 ```
