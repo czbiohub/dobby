@@ -193,7 +193,7 @@ drwx------  2 utility utility  4096 Aug  9 11:54 .vnc/
 Use your Client ID and Secret to authenticate in `-headless` mode for `google-drive-ocamlfuse`:
 
 ```
-google-drive-ocamlfuse ~/googledrive -headless -id 1234-asdf.apps.googleusercontent.com -secret asdfasdfasdf
+(py3) dobby@ds05:~/dobby$ google-drive-ocamlfuse ~/googledrive -headless -id 1234-asdf.apps.googleusercontent.com -secret asdfasdfasdf
 Please, open the following URL in a web browser: https://accounts.google.com/o/oauth2/auth?client_id=REDACTED
 Please enter the verification code: REDACTED
 Access token retrieved correctly.
