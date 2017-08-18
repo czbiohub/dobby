@@ -6,8 +6,10 @@ Dobby is the heroic house-elf that automates SampleSheet generation from Google 
 
 To set up the Google Drive API, these are the steps we took.
 
-### 1. Installation of
+### 1. Installation of command-line google drive for Ubuntu
+
 [`google-drive-ocamlfuse`](http://www.omgubuntu.co.uk/2017/04/mount-google-drive-ocamlfuse-linux)
+is a command-line client for interacting with Google Drive in Ubuntu.
 
 ```
 utility@ds06:~$ sudo add-apt-repository ppa:alessandro-strada/ppa
