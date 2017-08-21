@@ -99,3 +99,14 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# Dobby outputs
+concentrations/
+cherrypicked/
+fluorescence/
+non_cherrypicked/
+regression/
+without_standards_or_blanks/
+
+# Output from testing CLI
+test_output/
