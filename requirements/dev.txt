@@ -1,0 +1,7 @@
+click
+seaborn
+pandas
+matplotlib
+scipy
+ipdb
+pytest
