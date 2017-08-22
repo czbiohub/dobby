@@ -1,134 +1,12 @@
 import os
 
 import click
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from scipy.stats import linregress
-import seaborn as sns
 
-from .util import maybe_make_directory
-
-N_EXTRA_LINES = 409
-COLUMNS_TO_PARSE = 'C:Z'
-ROWS_TO_SKIP = 2
-
-STANDARDS_STR = '8,8,6,6,4,4,2,2,0.5,0.5,0.25,0.25,0,0'
-
-STANDARDS = pd.Series(
-    [8, 8, 6, 6, 4, 4, 2, 2, 1, 1, 0.5, 0.5, 0.025, 0.025, 0, 0])
-STANDARDS_COL = 24
-BLANKS_COL = 23
-
-
-def _parse_standards(standards_str):
-    return pd.Series(standards_str.split(',')).astype(float)
-
-
-def _parse_fluorescence(filename, filetype):
-    filetype = filetype.lower()
-
-    kwargs = dict(skiprows=ROWS_TO_SKIP)
-    if filetype == 'excel':
-        parser = pd.read_excel
-        kwargs.update(
-            dict(skip_footer=N_EXTRA_LINES, parse_cols=COLUMNS_TO_PARSE))
-    elif filetype == 'csv':
-        parser = pd.read_csv
-
-        # Use columns 1-24 (25 is not included)
-        kwargs['usecols'] = range(1, 25)
-        kwargs.update
-    elif filetype == 'txt' or filetype == 'table':
-        parser = pd.read_table
-        kwargs.update(dict(nrows=16, encoding='utf-16', skiprows=2,
-                           usecols=range(2, 26)))
-    else:
-        raise ValueError(f"'{filetype}' is not a supported file type. "
-                         "Only 'csv' and 'excel' are supported")
-    fluorescence = parser(filename, **kwargs)
-    fluorescence.columns = fluorescence.columns.astype(int)
-    return fluorescence
-
-
-def _plot_regression(means, regressed, plate_name, output_folder='.'):
-    means.plot(legend=True)
-    y = pd.Series(regressed.slope * means.index + regressed.intercept,
-                  index=means.index,
-                  name='Regression')
-    y.plot(legend=True)
-
-    # :.5 indicates 5 decimal places
-    plt.title(f'$R^2$ = {regressed.rvalue:.5}')
-
-    pdf = os.path.join(output_folder, 'regression',
-                       f'{plate_name}_regression_lines.pdf')
-    maybe_make_directory(pdf)
-    plt.savefig(pdf)
-    return pdf
-
-
-def _heatmap(data, plate_name, datatype, output_folder):
-    sns.heatmap(data)
-    plt.title(f'{plate_name} {datatype}')
-    pdf = os.path.join(output_folder, datatype,
-                       f'{plate_name}_{datatype}_heatmap.pdf')
-    maybe_make_directory(pdf)
-    plt.savefig(pdf)
-    print(f'{plate_name}: Wrote {datatype} heatmap to {pdf}')
-    return pdf
-
-
-def _fluorescence_to_concentration(fluorescence, standards_col, standards,
-                                   plate_name, plot=True,
-                                   output_folder='.', r_minimum=0.98, ):
-    """Use standards column to regress and convert to concentrations"""
-    means = fluorescence[standards_col].groupby(standards).mean()
-    stds = fluorescence[standards_col].groupby(standards).std()
-    regressed = linregress(means.index, means)
-
-    if regressed.rvalue < r_minimum:
-        raise ValueError(
-            f'Regression failed test: {regressed.rvalue} < {r_minimum}')
-
-    # Convert fluorescence to concentration
-    concentrations = (fluorescence - regressed.intercept) / regressed.slope
-
-    if plot:
-        pdf = _plot_regression(means, regressed, plate_name)
-        print(f'{plate_name}: Wrote regression plot to {pdf}')
-
-        _heatmap(fluorescence, plate_name, 'fluorescence', output_folder)
-        _heatmap(concentrations, plate_name, 'concentrations', output_folder)
-
-    return concentrations
-
-
-def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
-                    plot=True,
-                    output_folder='.'):
-    """Use blanks column to determine whether a well has enough fluorescence"""
-
-    average_blanks = concentrations[blanks_col].mean()
-    std_blanks = concentrations[blanks_col].std()
-
-    # Minimum threshold: One standard deviation away from the mean
-    avg_std = average_blanks + std_blanks
-
-    is_cell_good = concentrations > avg_std
-    n_good_cells = is_cell_good.sum().sum()
-    print(
-        f'{plate_name} ({mouse_id}) has {n_good_cells} cells passing C'
-        f'oncentration QC')
-    good_cells = concentrations[is_cell_good]
-
-    without_standards_or_blanks = good_cells.loc[:, :(blanks_col - 1)]
-
-    if plot:
-        _heatmap(without_standards_or_blanks, plate_name,
-                 'without_standards_or_blanks', output_folder)
-
-    return without_standards_or_blanks
+from dobby.dobby.cherrypick import BLANKS_COL, _cherrypick_wells
+from .convert import _fluorescence_to_concentration, STANDARDS_COL, \
+    STANDARDS_STR
+from .io import _parse_fluorescence
+from .util import maybe_make_directory, _parse_standards
 
 
 def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
@@ -172,6 +50,7 @@ def make_echo_pick_lists(filename, plate_name, mouse_id, filetype='txt',
                          plot=True, output_folder='.'):
     """Transform plate of cDNA fluorescence to ECHO pick list
     
+    \b
     Parameters
     ----------
     filename : str
@@ -195,14 +74,12 @@ def make_echo_pick_lists(filename, plate_name, mouse_id, filetype='txt',
 
     fluorescence = _parse_fluorescence(filename, filetype)
 
-    concentrations = _fluorescence_to_concentration(fluorescence,
-                                                    standards_col,
-                                                    standards, plate_name,
-                                                    plot,
-                                                    output_folder=output_folder)
-    good_cells = _get_good_cells(concentrations, blanks_col, plate_name,
-                                 mouse_id, output_folder=output_folder,
-                                 plot=plot)
+    concentrations = _fluorescence_to_concentration(
+        fluorescence, standards_col, standards, plate_name, plot,
+        output_folder=output_folder)
+    good_cells = _cherrypick_wells(concentrations, blanks_col, plate_name,
+                                   output_folder=output_folder,
+                                   plot=plot)
 
     _transform_to_pick_list(good_cells, plate_name, mouse_id, 'cherrypicked',
                             output_folder=output_folder)
