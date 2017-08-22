@@ -119,9 +119,10 @@ Error: In headless mode, you should specify a client id and a client secret
 
 Follow the instructions
 [here](https://developers.google.com/drive/v3/web/quickstart/python) to use the
-wizard to create Google API credentials. I've copied them below. There's a
-weird step where you're supposed to "Cancel" instead of press 'OK' so pay
-attention!
+wizard to create Google API credentials. Thanks to
+[Foad Green](https://github.com/foadgreen) who found these instructions in the
+sea of tips about Google OAuth setup. I've copied them below. There's a weird
+step where you're supposed to "Cancel" instead of press 'OK' so pay attention!
 
 1. Use [this wizard](https://console.developers.google.com/start/api?id=drive) to create or select a project in the Google Developers Console and automatically turn on the API. Click **Continue** , then **Go to credentials** .
 2. On the **Add credentials to your project** page, click the **Cancel** button.
