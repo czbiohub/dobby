@@ -4,7 +4,7 @@ from setuptools import setup
 
 version = '1.0.0'
 
-required = open('requirements.txt').read().split('\n')
+required = open('requirements/default.txt').read().split('\n')
 
 setup(
     name='dobby',
