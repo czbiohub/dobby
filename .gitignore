@@ -108,5 +108,5 @@ non_cherrypicked/
 regression/
 without_standards_or_blanks/
 
-# Output from testing CLI
+# Output from data CLI
 test_output/
