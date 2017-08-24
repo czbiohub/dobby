@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import linregress
 import seaborn as sns
-sns.set(context='talk')
+sns.set(context='paper')
 
 from .util import maybe_make_directory
 
@@ -72,7 +72,7 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
 
 
 def _heatmap(data, plate_name, datatype, output_folder):
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(6, 4))
     sns.heatmap(data, annot=True, ax=ax)
     plt.title(f'{plate_name} {datatype}')
     pdf = os.path.join(output_folder, datatype,
