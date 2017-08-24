@@ -2,12 +2,15 @@ import os
 import string
 
 import click
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import linregress
 import seaborn as sns
 sns.set(context='paper')
+
+mpl.use('agg')
 
 from .util import maybe_make_directory
 
@@ -106,7 +109,7 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
     concentrations = (fluorescence - regressed.intercept) / regressed.slope
 
     if regressed.rvalue < r_minimum:
-        print(f'Regression failed test: {regressed.rvalue} < {r_minimum}')
+        print(f'\tRegression failed test: {regressed.rvalue} < {r_minimum}')
         output_folder = os.path.join(output_folder, 'failed')
 
     if plot:
