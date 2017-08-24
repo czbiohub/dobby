@@ -24,7 +24,7 @@ Commands:
 Right now, the only command is to "cherrypick" a fluorescence plate reader output:
 
 ```
- dobby cherrypick -h
+$ dobby cherrypick -h
 Usage: dobby cherrypick [OPTIONS] FILENAME PLATE_NAME MOUSE_ID
 
   Transform plate of cDNA fluorescence to ECHO pick list
