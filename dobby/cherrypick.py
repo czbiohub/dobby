@@ -53,6 +53,7 @@ def _parse_fluorescence(filename, filetype):
 
 
 def _plot_regression(means, regressed, plate_name, output_folder='.'):
+    means.name = 'Means of standard concentrations'
     means.plot(legend=True)
     y = pd.Series(regressed.slope * means.index + regressed.intercept,
                   index=means.index,
@@ -66,16 +67,19 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
                        f'{plate_name}_regression_lines.pdf')
     maybe_make_directory(pdf)
     plt.savefig(pdf)
+    plt.tight_layout()
     return pdf
 
 
 def _heatmap(data, plate_name, datatype, output_folder):
-    sns.heatmap(data, annot=True)
+    fig, ax = plt.subplots()
+    sns.heatmap(data, annot=True, ax=ax)
     plt.title(f'{plate_name} {datatype}')
     pdf = os.path.join(output_folder, datatype,
                        f'{plate_name}_{datatype}_heatmap.pdf')
     maybe_make_directory(pdf)
-    plt.savefig(pdf)
+    fig.tight_layout()
+    fig.savefig(pdf)
     print(f'{plate_name}: Wrote {datatype} heatmap to {pdf}')
     return pdf
 
@@ -88,10 +92,6 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
     stds = fluorescence[standards_col].groupby(standards).std()
     regressed = linregress(means.index, means)
 
-    if regressed.rvalue < r_minimum:
-        raise ValueError(
-            f'Regression failed test: {regressed.rvalue} < {r_minimum}')
-
     # Convert fluorescence to concentration
     concentrations = (fluorescence - regressed.intercept) / regressed.slope
 
@@ -101,6 +101,10 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
 
         _heatmap(fluorescence, plate_name, 'fluorescence', output_folder)
         _heatmap(concentrations, plate_name, 'concentrations', output_folder)
+
+    if regressed.rvalue < r_minimum:
+        raise ValueError(
+            f'Regression failed test: {regressed.rvalue} < {r_minimum}')
 
     return concentrations
 
