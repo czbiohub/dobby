@@ -105,6 +105,10 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
     # Convert fluorescence to concentration
     concentrations = (fluorescence - regressed.intercept) / regressed.slope
 
+    if regressed.rvalue < r_minimum:
+        print(f'Regression failed test: {regressed.rvalue} < {r_minimum}')
+        output_folder = os.path.join(output_folder, 'failed')
+
     if plot:
         pdf = _plot_regression(means, regressed, plate_name,
                                output_folder=output_folder)
@@ -114,10 +118,6 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
                  fmt='.1f', title_suffix=' (in 100,000 fluorescence units)')
         _heatmap(concentrations, plate_name, 'concentrations', output_folder,
                  fmt='.1f')
-
-    if regressed.rvalue < r_minimum:
-        raise ValueError(
-            f'Regression failed test: {regressed.rvalue} < {r_minimum}')
 
     return concentrations
 
