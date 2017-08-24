@@ -1,4 +1,5 @@
 import os
+import string
 
 import click
 import matplotlib.pyplot as plt
@@ -14,16 +15,17 @@ N_EXTRA_LINES = 409
 COLUMNS_TO_PARSE = 'C:Z'
 ROWS_TO_SKIP = 2
 
-STANDARDS_STR = '8,8,6,6,4,4,2,2,0.5,0.5,0.25,0.25,0,0'
+STANDARDS_STR = '8,8,6,6,4,4,2,2,1,1,0.5,0.5,0.25,0.25,0,0'
 
-STANDARDS = pd.Series(
-    [8, 8, 6, 6, 4, 4, 2, 2, 1, 1, 0.5, 0.5, 0.025, 0.025, 0, 0])
+STANDARDS = [8, 8, 6, 6, 4, 4, 2, 2, 1, 1, 0.5, 0.5, 0.025, 0.025, 0, 0]
 STANDARDS_COL = 24
 BLANKS_COL = 23
 
 
 def _parse_standards(standards_str):
-    return pd.Series(standards_str.split(',')).astype(float)
+    values = standards_str.split(',')
+    index = list(string.ascii_uppercase[:len(values)])
+    return pd.Series(values, index=index).astype(float)
 
 
 def _parse_fluorescence(filename, filetype):
@@ -49,16 +51,20 @@ def _parse_fluorescence(filename, filetype):
                          "Only 'csv' and 'excel' are supported")
     fluorescence = parser(filename, **kwargs)
     fluorescence.columns = fluorescence.columns.astype(int)
+    fluorescence.index = list(string.ascii_uppercase[:len(fluorescence.index)])
     return fluorescence
 
 
 def _plot_regression(means, regressed, plate_name, output_folder='.'):
+    fig, ax = plt.subplots()
     means.name = 'Means of standard concentrations'
-    means.plot(legend=True)
     y = pd.Series(regressed.slope * means.index + regressed.intercept,
                   index=means.index,
                   name='Regression')
-    y.plot(legend=True)
+
+    ax.plot(means, 'o-', label=means.name)
+    ax.plot(y, 'o-', label=y.name)
+    ax.legend()
 
     # :.5 indicates 5 decimal places
     plt.title(f'$R^2$ = {regressed.rvalue:.5}')
@@ -66,15 +72,17 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
     pdf = os.path.join(output_folder, 'regression',
                        f'{plate_name}_regression_lines.pdf')
     maybe_make_directory(pdf)
-    plt.savefig(pdf)
-    plt.tight_layout()
+    fig.savefig(pdf)
+    fig.tight_layout()
     return pdf
 
 
-def _heatmap(data, plate_name, datatype, output_folder):
-    fig, ax = plt.subplots(figsize=(6, 4))
-    sns.heatmap(data, annot=True, ax=ax)
-    plt.title(f'{plate_name} {datatype}')
+def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
+             **kwargs):
+    title_suffix = '' if title_suffix is None else title_suffix
+    fig, ax = plt.subplots(figsize=(8, 4))
+    sns.heatmap(data, annot=True, ax=ax, annot_kws={"size": 8}, **kwargs)
+    plt.title(f'{plate_name} {datatype}' + title_suffix)
     pdf = os.path.join(output_folder, datatype,
                        f'{plate_name}_{datatype}_heatmap.pdf')
     maybe_make_directory(pdf)
@@ -88,6 +96,8 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
                                    plate_name, plot=True,
                                    output_folder='.', r_minimum=0.98, ):
     """Use standards column to regress and convert to concentrations"""
+    standards = pd.Series(standards, index=fluorescence.index)
+
     means = fluorescence[standards_col].groupby(standards).mean()
     stds = fluorescence[standards_col].groupby(standards).std()
     regressed = linregress(means.index, means)
@@ -96,11 +106,14 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
     concentrations = (fluorescence - regressed.intercept) / regressed.slope
 
     if plot:
-        pdf = _plot_regression(means, regressed, plate_name)
+        pdf = _plot_regression(means, regressed, plate_name,
+                               output_folder=output_folder)
         print(f'{plate_name}: Wrote regression plot to {pdf}')
 
-        _heatmap(fluorescence, plate_name, 'fluorescence', output_folder)
-        _heatmap(concentrations, plate_name, 'concentrations', output_folder)
+        _heatmap(fluorescence/1e6, plate_name, 'fluorescence', output_folder,
+                 fmt='.1f', title_suffix=' (in 100,000 fluorescence units)')
+        _heatmap(concentrations, plate_name, 'concentrations', output_folder,
+                 fmt='.1f')
 
     if regressed.rvalue < r_minimum:
         raise ValueError(
@@ -131,7 +144,7 @@ def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
 
     if plot:
         _heatmap(without_standards_or_blanks, plate_name,
-                 'without_standards_or_blanks', output_folder)
+                 'concentrations_cherrypicked_no_standards_or_blanks', output_folder)
 
     return without_standards_or_blanks
 
