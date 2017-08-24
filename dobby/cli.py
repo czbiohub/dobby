@@ -1,6 +1,6 @@
 import click
 
-from dobby.echo_pick_lists import make_echo_pick_lists
+from dobby.cherrypick import cherrypick
 
 settings = dict(help_option_names=['-h', '--help'])
 
@@ -15,7 +15,7 @@ def cli():
     pass
 
 
-cli.add_command(make_echo_pick_lists)
+cli.add_command(cherrypick)
 
 
 if __name__ == "__main__":
