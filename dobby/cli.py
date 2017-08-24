@@ -9,8 +9,8 @@ settings = dict(help_option_names=['-h', '--help'])
              context_settings=settings)
 def cli():
     """
-    Hi! Dobby is a free and open source package for converting and managing 
-    cDNA concentration files, ECHO pick lists, and sample sheets
+    Hi! Dobby is the heroic house-elf that automates SampleSheet generation 
+    from Google Sheets. And, of course, Dobby is free.
     """
     pass
 

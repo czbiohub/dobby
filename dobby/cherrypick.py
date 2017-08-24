@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import linregress
 import seaborn as sns
+sns.set(context='talk')
 
 from .util import maybe_make_directory
 
@@ -69,7 +70,7 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
 
 
 def _heatmap(data, plate_name, datatype, output_folder):
-    sns.heatmap(data)
+    sns.heatmap(data, annot=True)
     plt.title(f'{plate_name} {datatype}')
     pdf = os.path.join(output_folder, datatype,
                        f'{plate_name}_{datatype}_heatmap.pdf')
@@ -165,11 +166,11 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
 @click.option('--standards', default=STANDARDS_STR)
 @click.option('--plot', is_flag=True)
 @click.option('--output-folder', default='.')
-def make_echo_pick_lists(filename, plate_name, mouse_id, filetype='txt',
-                         # metadata='~/maca-dash/MACA_Metadata\ -\ 384_well_plates.csv ',
+def cherrypick(filename, plate_name, mouse_id, filetype='txt',
+               # metadata='~/maca-dash/MACA_Metadata\ -\ 384_well_plates.csv ',
                          standards_col=STANDARDS_COL, blanks_col=BLANKS_COL,
-                         standards=STANDARDS_STR,
-                         plot=True, output_folder='.'):
+               standards=STANDARDS_STR,
+               plot=True, output_folder='.'):
     """Transform plate of cDNA fluorescence to ECHO pick list
     
     Parameters
