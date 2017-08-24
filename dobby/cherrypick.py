@@ -154,8 +154,7 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
     return csv
 
 
-@click.command('make_echo_pick_lists',
-               short_help="Convert concentrations --> ECHO pick list")
+@click.command(short_help="Convert concentrations --> ECHO pick list")
 @click.argument('filename')
 @click.argument('plate_name')
 @click.argument('mouse_id')
