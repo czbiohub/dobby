@@ -176,7 +176,9 @@ def _adjust_output_if_fail_sanity_check(concentrations, blanks_col, standards,
 
 
 def _sanity_check_blanks(concentrations, blanks_col):
-    return (concentrations[blanks_col] < 0).any()
+    """Make sure all concentrations in blanks columns are positive"""
+    import pdb; pdb.set_trace()
+    return (concentrations[blanks_col] > 0).all()
 
 
 def _sanity_check_standards(concentrations, standards, standards_col):
