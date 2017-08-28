@@ -21,9 +21,13 @@ ROWS_TO_SKIP = 2
 
 STANDARDS_STR = '8,8,6,6,4,4,2,2,1,1,0.5,0.5,0.25,0.25,0,0'
 
-STANDARDS = [8, 8, 6, 6, 4, 4, 2, 2, 1, 1, 0.5, 0.5, 0.025, 0.025, 0, 0]
+STANDARDS = [8, 8, 6, 6, 4, 4, 2, 2, 1, 1, 0.5, 0.5, 0.25, 0.25, 0, 0]
 STANDARDS_COL = 24
 BLANKS_COL = 23
+
+CONCENTRATIONS_THRESHOLD = 0.7
+
+FLAGGED = 'flagged'
 
 
 def _parse_standards(standards_str):
@@ -78,6 +82,7 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
     maybe_make_directory(pdf)
     fig.savefig(pdf)
     fig.tight_layout()
+    print(f'{plate_name}: Wrote regression plot to {pdf}')
     return pdf
 
 
@@ -109,7 +114,7 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
         Filename of the heatmap
     """
     if drop_standards:
-        no_standards = data.drop(24, axis=1, errors='ignore')
+        no_standards = data.drop(STANDARDS_COL, axis=1, errors='ignore')
     else:
         no_standards = data
 
@@ -128,15 +133,12 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
 
 
 def _fluorescence_to_concentration(fluorescence, standards_col, standards,
-                                   plate_name, plot=True,
                                    output_folder='.', r_minimum=0.98,
                                    inner=True):
     """Use standards column to regress and convert to concentrations"""
     standards = pd.Series(standards, index=fluorescence.index)
 
     means = fluorescence[standards_col].groupby(standards).mean()
-    import pdb;
-    pdb.set_trace()
     # Don't use the very first or very last concentrations for regressing
     if inner:
         means = pd.Series(means.values[1:-1], means.index[1:-1])
@@ -149,22 +151,62 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
         print(f'\tRegression failed test: {regressed.rvalue} < {r_minimum}')
         output_folder = os.path.join(output_folder, 'failed')
 
-    if plot:
-        pdf = _plot_regression(means, regressed, plate_name,
-                               output_folder=output_folder)
-        print(f'{plate_name}: Wrote regression plot to {pdf}')
+    return concentrations, means, regressed
 
-        _heatmap(fluorescence / 1e6, plate_name, 'fluorescence', output_folder,
-                 fmt='.1f', title_suffix=' (in 100,000 fluorescence units)')
-        _heatmap(concentrations, plate_name, 'concentrations', output_folder,
-                 fmt='.1f')
 
-    return concentrations
+def _adjust_output_if_fail_sanity_check(concentrations, blanks_col, standards,
+                                        standards_col, good_cells, threshold,
+                                        output_folder, plate_name, mouse_id):
+    pass_blanks = _sanity_check_blanks(concentrations, blanks_col)
+    pass_standards = _sanity_check_standards(concentrations, standards,
+                                                standards_col)
+    pass_samples = _sanity_check_samples(good_cells, threshold)
+
+    if not pass_blanks:
+        output_folder = os.path.join(output_folder, FLAGGED, 'blanks')
+        print(f'\t{plate_name} ({mouse_id}) was flagged for blanks')
+    elif not pass_standards:
+        output_folder = os.path.join(output_folder, FLAGGED, 'standards')
+        print(f'\t{plate_name} ({mouse_id}) was flagged for standards')
+    elif not pass_samples:
+        output_folder = os.path.join(output_folder, FLAGGED, 'samples')
+        print(f'\t{plate_name} ({mouse_id}) was flagged for samples')
+
+    return output_folder
+
+
+def _sanity_check_blanks(concentrations, blanks_col):
+    return (concentrations[blanks_col] < 0).any()
+
+
+def _sanity_check_standards(concentrations, standards, standards_col):
+    """Ensure that standards correspond to increasing concentrations 
+    
+    Check if wells with larger known concentrations have smaller measured 
+    concentrations than wells with smaller known concentrations. E.g. if the 0
+    .5 concentrations wells were measured as smaller than the 0.25 
+    concentrations wells. 
+    """
+    standards_unique = standards.sort_values().unique()
+    second_smallest = concentrations.loc[standards == standards_unique[1],
+                                         standards_col]
+    third_smallest = concentrations.loc[standards == standards_unique[2],
+                                        standards_col]
+    pass_sanity_check = third_smallest.map(
+        lambda x: ((second_smallest - x) < 0).any()).any()
+    return pass_sanity_check
+
+
+def _sanity_check_samples(good_cells, threshold=CONCENTRATIONS_THRESHOLD):
+    """Make sure the mean concentrations of the good cells is above 0.7"""
+    mean = np.mean(good_cells.values[pd.notnull(good_cells)])
+    std = np.std(good_cells.values[pd.notnull(good_cells)])
+    pass_sanity_check = mean + std > threshold
+    return pass_sanity_check
 
 
 def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
-                    plot=True,
-                    output_folder='.'):
+                    plot=True, output_folder='.'):
     """Use blanks column to determine whether a well has enough fluorescence"""
 
     average_blanks = concentrations[blanks_col].mean()
@@ -212,34 +254,42 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
     return csv
 
 
-@click.command(short_help="Convert concentrations --> ECHO pick list")
+@click.command(short_help="Use 384-well plate reader fluorescence to choose "
+                          "only cells with high enough signals")
 @click.argument('filename')
 @click.argument('plate_name')
 @click.argument('mouse_id')
 @click.option('--filetype', default='txt')
-@click.option('--standards-col', default=STANDARDS_COL, type=int)
-@click.option('--blanks_col', default=BLANKS_COL)
-@click.option('--standards', default=STANDARDS_STR)
+@click.option('--standards-col', default=STANDARDS_COL, type=int,
+              help='Column containing concentration standards. used for linear'
+                   ' regression.')
+@click.option('--blanks-col', default=BLANKS_COL,
+              help='Column number containing blanks aka empty wells')
+@click.option('--standards', default=STANDARDS_STR,
+              help='Values of the ')
 @click.option('--plot', is_flag=True)
 @click.option('--output-folder', default='.')
+@click.option('--inner-standards', default=True, type=bool)
+@click.option('--concentrations-threshold', default=CONCENTRATIONS_THRESHOLD,
+              help='Minimum value of concentrations for (mean + std) of '
+                   'cherrypicked cells')
 def cherrypick(filename, plate_name, mouse_id, filetype='txt',
                standards_col=STANDARDS_COL, blanks_col=BLANKS_COL,
                standards=STANDARDS_STR,
-               plot=True, output_folder='.'):
+               plot=True, output_folder='.',
+               inner_standards=True,
+               concentrations_threshold=CONCENTRATIONS_THRESHOLD):
     """Transform plate of cDNA fluorescence to ECHO pick list
     
     Parameters
     ----------
     filename : str
         Name of the cDNA fluorescence 384 well QC output
-    plate_name
-    mouse_id
-    filetype
-    standards_col
-    blanks_col
-    standards
-    plot
-    output_folder
+    plate_name : str
+        Name of the plate
+    mouse_id : str
+        Name of the mouse, necessary for creating the cherrypick/non cherrypick
+        lists
 
     Returns
     -------
@@ -251,14 +301,26 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
 
     fluorescence = _parse_fluorescence(filename, filetype)
 
-    concentrations = _fluorescence_to_concentration(fluorescence,
-                                                    standards_col,
-                                                    standards, plate_name,
-                                                    plot,
-                                                    output_folder=output_folder)
+    concentrations, means, regressed = _fluorescence_to_concentration(
+        fluorescence, standards_col, standards, output_folder=output_folder,
+        inner=inner_standards)
+
     good_cells = _get_good_cells(concentrations, blanks_col, plate_name,
                                  mouse_id, output_folder=output_folder,
                                  plot=plot)
+
+    output_folder = _adjust_output_if_fail_sanity_check(
+        concentrations, blanks_col, standards, standards_col, good_cells,
+        concentrations_threshold, output_folder, plate_name, mouse_id)
+
+    if plot:
+        _plot_regression(means, regressed, plate_name,
+                         output_folder=output_folder)
+
+        _heatmap(fluorescence / 1e6, plate_name, 'fluorescence', output_folder,
+                 fmt='.1f', title_suffix=' (in 100,000 fluorescence units)')
+        _heatmap(concentrations, plate_name, 'concentrations', output_folder,
+                 fmt='.1f')
 
     _transform_to_pick_list(good_cells, plate_name, mouse_id, 'cherrypicked',
                             output_folder=output_folder)
