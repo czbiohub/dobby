@@ -81,10 +81,40 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
 
 
 def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
-             **kwargs):
+             drop_standards=True, **kwargs):
+    """Draw a heatmap of values
+    
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        The 384-well fluorescence or concentration to plot
+    plate_name : str
+        Name of the plate
+    datatype : str
+        Type of data, e.g. "fluorescence" or "concentration"
+    output_folder : str 
+        Location of the folder to output
+    title_suffix : str
+        Additional information to add to the title
+    drop_standards : bool
+        If True, then remove the 24th column which contains standard 
+        concentrations for plotting
+    kwargs 
+        Any other keyword arguments for seaborn.heatmap
+
+    Returns
+    -------
+    pdf : str
+        Filename of the heatmap
+    """
+    if drop_standards:
+        no_standards = data.drop(24, axis=1, errors='ignore')
+    else:
+        no_standards = data
+
     title_suffix = '' if title_suffix is None else title_suffix
     fig, ax = plt.subplots(figsize=(8, 4))
-    sns.heatmap(data, annot=True, ax=ax, annot_kws={"size": 8}, **kwargs)
+    sns.heatmap(no_standards, annot=True, ax=ax, annot_kws={"size": 8}, **kwargs)
     plt.title(f'{plate_name} {datatype}' + title_suffix)
     pdf = os.path.join(output_folder, datatype,
                        f'{plate_name}_{datatype}_heatmap.pdf')
