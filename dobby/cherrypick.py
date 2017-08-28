@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import linregress
 import seaborn as sns
+
 sns.set(context='paper')
 
 mpl.use('agg')
@@ -114,7 +115,8 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
 
     title_suffix = '' if title_suffix is None else title_suffix
     fig, ax = plt.subplots(figsize=(8, 4))
-    sns.heatmap(no_standards, annot=True, ax=ax, annot_kws={"size": 8}, **kwargs)
+    sns.heatmap(no_standards, annot=True, ax=ax, annot_kws={"size": 8},
+                **kwargs)
     plt.title(f'{plate_name} {datatype}' + title_suffix)
     pdf = os.path.join(output_folder, datatype,
                        f'{plate_name}_{datatype}_heatmap.pdf')
@@ -127,12 +129,17 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
 
 def _fluorescence_to_concentration(fluorescence, standards_col, standards,
                                    plate_name, plot=True,
-                                   output_folder='.', r_minimum=0.98, ):
+                                   output_folder='.', r_minimum=0.98,
+                                   inner=True):
     """Use standards column to regress and convert to concentrations"""
     standards = pd.Series(standards, index=fluorescence.index)
 
     means = fluorescence[standards_col].groupby(standards).mean()
-    stds = fluorescence[standards_col].groupby(standards).std()
+    import pdb;
+    pdb.set_trace()
+    # Don't use the very first or very last concentrations for regressing
+    if inner:
+        means = pd.Series(means.values[1:-1], means.index[1:-1])
     regressed = linregress(means.index, means)
 
     # Convert fluorescence to concentration
@@ -147,7 +154,7 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
                                output_folder=output_folder)
         print(f'{plate_name}: Wrote regression plot to {pdf}')
 
-        _heatmap(fluorescence/1e6, plate_name, 'fluorescence', output_folder,
+        _heatmap(fluorescence / 1e6, plate_name, 'fluorescence', output_folder,
                  fmt='.1f', title_suffix=' (in 100,000 fluorescence units)')
         _heatmap(concentrations, plate_name, 'concentrations', output_folder,
                  fmt='.1f')
@@ -177,7 +184,8 @@ def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
 
     if plot:
         _heatmap(without_standards_or_blanks, plate_name,
-                 'concentrations_cherrypicked_no_standards_or_blanks', output_folder)
+                 'concentrations_cherrypicked_no_standards_or_blanks',
+                 output_folder)
 
     return without_standards_or_blanks
 
@@ -209,15 +217,13 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
 @click.argument('plate_name')
 @click.argument('mouse_id')
 @click.option('--filetype', default='txt')
-# @click.option('--metadata', default='~/maca-dash/MACA_Metadata\ -\ 384_well_plates.csv ')
 @click.option('--standards-col', default=STANDARDS_COL, type=int)
 @click.option('--blanks_col', default=BLANKS_COL)
 @click.option('--standards', default=STANDARDS_STR)
 @click.option('--plot', is_flag=True)
 @click.option('--output-folder', default='.')
 def cherrypick(filename, plate_name, mouse_id, filetype='txt',
-               # metadata='~/maca-dash/MACA_Metadata\ -\ 384_well_plates.csv ',
-                         standards_col=STANDARDS_COL, blanks_col=BLANKS_COL,
+               standards_col=STANDARDS_COL, blanks_col=BLANKS_COL,
                standards=STANDARDS_STR,
                plot=True, output_folder='.'):
     """Transform plate of cDNA fluorescence to ECHO pick list
@@ -258,5 +264,3 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
                             output_folder=output_folder)
     _transform_to_pick_list(concentrations, plate_name, mouse_id,
                             'non_cherrypicked', output_folder=output_folder)
-
-
