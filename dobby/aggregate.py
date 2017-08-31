@@ -79,8 +79,8 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
             aggregated = aggregated.rename(
                 columns={"well": "Source well", 'concentration': 'C(ng/ul)',
                          'plate': 'Plate number', 'name': "Name", })
-            aggregated['Desired C'] = 0.5
-            aggregated['Final V'] = 400
+            aggregated['Desired C'] = desired_concentration
+            aggregated['Final V'] = final_volume
             aggregated["Verdict"] = 1
             aggregated['Type'] = 'Unknown'
 
