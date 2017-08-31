@@ -1,6 +1,7 @@
 import click
 
 from dobby.cherrypick import cherrypick
+from dobby.aggregate import aggregate
 
 settings = dict(help_option_names=['-h', '--help'])
 
@@ -16,7 +17,7 @@ def cli():
 
 
 cli.add_command(cherrypick)
-
+cli.add_command(aggregate)
 
 if __name__ == "__main__":
     cli()

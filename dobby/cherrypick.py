@@ -1,5 +1,6 @@
 import os
 import string
+import warnings
 
 import click
 import matplotlib as mpl
@@ -11,7 +12,9 @@ import seaborn as sns
 
 sns.set(context='paper')
 
-mpl.use('agg')
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    mpl.use('agg')
 
 from .util import maybe_make_directory
 
