@@ -28,7 +28,9 @@ STANDARDS = [8, 8, 6, 6, 4, 4, 2, 2, 1, 1, 0.5, 0.5, 0.25, 0.25, 0, 0]
 STANDARDS_COL = 24
 BLANKS_COL = 23
 
-CONCENTRATIONS_THRESHOLD = 0.7
+CONCENTRATIONS_MINIMUM = 0.7
+CONCENTRATIONS_MAXIMUM = 10
+R_MINIMUM = 0.98
 
 FLAGGED = 'flagged'
 
@@ -136,7 +138,7 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
 
 
 def _fluorescence_to_concentration(fluorescence, standards_col, standards,
-                                   output_folder='.', r_minimum=0.98,
+                                   output_folder='.', r_minimum=R_MINIMUM,
                                    inner=True):
     """Use standards column to regress and convert to concentrations"""
     standards = pd.Series(standards, index=fluorescence.index)
@@ -157,15 +159,18 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
     return concentrations, means, regressed
 
 
-def _adjust_output_if_fail_sanity_check(concentrations, blanks_col, standards,
-                                        standards_col, good_cells, threshold,
+def _adjust_output_if_fail_sanity_check(concentrations, blanks_col,
+                                        good_cells, concentrations_minimum,
+                                        concentration_maximum,
                                         regressed, r_minimum,
                                         output_folder, platename, mouse_id):
     pass_regression = _sanity_check_regression(regressed, r_minimum)
     pass_blanks = _sanity_check_blanks(concentrations, blanks_col)
-    pass_samples = _sanity_check_samples(good_cells, threshold)
+    pass_samples = _sanity_check_samples(good_cells, concentrations_minimum)
+    pass_concentration = _sanity_check_concentration(concentrations,
+                                                     concentration_maximum)
 
-    checks = (pass_regression, pass_blanks, pass_samples)
+    checks = pass_regression, pass_blanks, pass_samples, pass_concentration
 
     if sum(checks) < len(checks):
         return _append_flagged_output_folder(output_folder, 'repeat_flags',
@@ -177,7 +182,7 @@ def _adjust_output_if_fail_sanity_check(concentrations, blanks_col, standards,
                                                       '1stpass_regression',
                                                       'regression', platename,
                                                       mouse_id)
-    if not pass_blanks:
+    elif not pass_blanks:
         output_folder = _append_flagged_output_folder(output_folder,
                                                       '2ndpass_blanks',
                                                       'blanks', platename,
@@ -186,6 +191,12 @@ def _adjust_output_if_fail_sanity_check(concentrations, blanks_col, standards,
         output_folder = _append_flagged_output_folder(output_folder,
                                                       '3rdpass_samples',
                                                       'samples', platename,
+                                                      mouse_id)
+    elif not pass_concentration:
+        output_folder = _append_flagged_output_folder(output_folder,
+                                                      '4thpass_concentration',
+                                                      'concentration too high',
+                                                      platename,
                                                       mouse_id)
     return output_folder
 
@@ -197,8 +208,13 @@ def _append_flagged_output_folder(output_folder, flagname, reason, platename,
     return output_folder
 
 
+def _sanity_check_concentration(concentrations, concentration_maximum):
+    """Returns True if sanity checked passed"""
+    return np.all(concentrations <= concentration_maximum)
+
+
 def _sanity_check_regression(regressed, r_minimum):
-    """REturns True if sanity checked passed"""
+    """Returns True if sanity checked passed"""
     pass_sanity_check = regressed.rvalue >= r_minimum
     return pass_sanity_check
 
@@ -236,7 +252,7 @@ def _sanity_check_standards(concentrations, standards, standards_col):
     return pass_sanity_check
 
 
-def _sanity_check_samples(good_cells, threshold=CONCENTRATIONS_THRESHOLD):
+def _sanity_check_samples(good_cells, threshold=CONCENTRATIONS_MINIMUM):
     """Make sure the mean concentrations of the good cells is above 0.7
     
     Returns
@@ -314,15 +330,24 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
 @click.option('--plot', is_flag=True)
 @click.option('--output-folder', default='.')
 @click.option('--inner-standards', default=True, type=bool)
-@click.option('--concentrations-threshold', default=CONCENTRATIONS_THRESHOLD,
-              help='Minimum value of concentrations for (mean + std) of '
-                   'cherrypicked cells')
+@click.option('--concentrations-minimum', default=CONCENTRATIONS_MINIMUM,
+              help='Minimum value (in ug/ml) of concentrations for '
+                   '(mean + std) of cherrypicked cells')
+@click.option('--concentrations-maximum', default=CONCENTRATIONS_MAXIMUM,
+              help='Minimum value (in ug/ml) of global concentrations for a '
+                   'plate. If any cell in a plate is above this value, the '
+                   'plate is flagged')
+@click.option('--r-minimum', default=R_MINIMUM,
+              help='Minimum value of pearson correlation between regression '
+                   'and standards lines')
 def cherrypick(filename, plate_name, mouse_id, filetype='txt',
                standards_col=STANDARDS_COL, blanks_col=BLANKS_COL,
                standards=STANDARDS_STR,
                plot=True, output_folder='.',
                inner_standards=True,
-               concentrations_threshold=CONCENTRATIONS_THRESHOLD):
+               concentrations_minimum=CONCENTRATIONS_MINIMUM,
+               concentrations_maximum=CONCENTRATIONS_MAXIMUM,
+               r_minimum=R_MINIMUM):
     """Transform plate of cDNA fluorescence to ECHO pick list
     
     \b
@@ -348,16 +373,16 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
 
     concentrations, means, regressed = _fluorescence_to_concentration(
         fluorescence, standards_col, standards, output_folder=output_folder,
-        inner=inner_standards)
+        inner=inner_standards, r_minimum=r_minimum)
 
     good_cells = _get_good_cells(concentrations, blanks_col, plate_name,
                                  mouse_id, output_folder=output_folder,
                                  plot=plot)
 
     output_folder = _adjust_output_if_fail_sanity_check(
-        concentrations, blanks_col, standards, standards_col, good_cells,
-        concentrations_threshold, means, regressed,
-        output_folder, plate_name, mouse_id)
+        concentrations, blanks_col, good_cells,
+        concentrations_minimum, concentrations_maximum,
+        regressed, r_minimum, output_folder, plate_name, mouse_id)
 
     if plot:
         _plot_regression(means, regressed, plate_name,
