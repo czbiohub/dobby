@@ -44,18 +44,31 @@ def round_partial(value, resolution):
 
 @click.command(short_help="Collect cherrypicked files into 384-well ECHO pick "
                           "list ready files")
-@click.argument('filenames', nargs=-1, type=click.Path(dir_okay=False,
-                                                       readable=True))
-@click.option('--plate-size', type=int, default=PLATE_SIZE)
-@click.option('--output-folder', default='.', type=click.Path(dir_okay=True,
-                                                              writable=True))
+@click.argument('filenames', nargs=-1,
+                type=click.Path(dir_okay=False, readable=True))
+@click.option('--plate-size', type=int, default=PLATE_SIZE,
+              help='Number of samples in the final plate')
+@click.option('--output-folder', default='.',
+              help="Folder to output the aggregated files to",
+              type=click.Path(dir_okay=True, writable=True))
 @click.option('--desired-concentration', default=0.5, type=float,
               help='Concentration in ng/ul')
 @click.option('--final-volume', default=400, type=int,
               help='Volume to dilute cDNA to')
-@click.option('--round-volume-to', default=ROUND_VOLUME_TO, help='A')
+@click.option('--round-volume-to', default=ROUND_VOLUME_TO,
+              help="Many machines can't produce volumes of any precision, so "
+                   "this ensures that the final volumes are rounded to a "
+                   "usable number")
 def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
               final_volume=400, round_volume_to=ROUND_VOLUME_TO):
+    """Glue together cherrypick files by 384 samples for an ECHO pick list
+    
+    \b
+    Parameters
+    ----------
+    filenames : str
+        Tidy files created by "dobby cherrypick" to aggregate 
+    """
     mass = desired_concentration * final_volume
 
     aggregated = pd.DataFrame()
@@ -114,11 +127,12 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
             i += 1
 
             # Reset the filename keepers and growing datafarame
-            seen = []
+            seen = [filename]
             aggregated = to_keep
 
     if aggregated.shape[0] > 0:
-        click.echo("({n}) files ({names}) didn't make it into a pick list "
-                   ":(".format(n=len(seen), names=', '.join(seen)))
+        click.echo("({n}) samples from ({names}) didn't make it into a pick "
+                   "list "
+                   ":(".format(n=aggregated.shape[0], names=', '.join(seen)))
 
 
