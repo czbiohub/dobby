@@ -226,7 +226,7 @@ def _sanity_check_blanks(concentrations, blanks_col):
     -------
     True if sanity check passed
     """
-    return (concentrations[blanks_col] > 0).all()
+    return concentrations[blanks_col].mean() > 0
 
 
 def _sanity_check_standards(concentrations, standards, standards_col):
