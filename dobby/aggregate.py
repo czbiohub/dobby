@@ -131,7 +131,7 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
             aggregated = to_keep
 
     if aggregated.shape[0] > 0:
-        click.echo("({n}) samples from ({names}) didn't make it into a pick "
+        click.echo("{n} samples from ({names}) didn't make it into a pick "
                    "list "
                    ":(".format(n=aggregated.shape[0], names=', '.join(seen)))
 
