@@ -82,9 +82,10 @@ Wrote non_cherrypicked ECHO pick list to test_output/non_cherrypicked/MAA000154_
 ### Example: Aggergate
 
 
-```
+
 ```
 dobby  aggregate  --desired-concentration 0.3 ~/Google\ Drive/MACA/384W_QC/plate_reader/raw_plate_reader_output/3\ Month/cherrypicked/*.csv --output-folder ~/Google\ Drive/MACA/cDNA\ Pick\ Lists/3_month/
+```
 
 Advanced usage: sort files by date, then aggregate:
 
