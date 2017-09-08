@@ -2,6 +2,7 @@ import click
 
 from dobby.cherrypick import cherrypick
 from dobby.aggregate import aggregate
+from dobby.selector import selector
 
 settings = dict(help_option_names=['-h', '--help'])
 
@@ -10,14 +11,14 @@ settings = dict(help_option_names=['-h', '--help'])
              context_settings=settings)
 def cli():
     """
-    Hi! Dobby is the heroic house-elf that automates SampleSheet generation 
+    Hi! Dobby is the heroic house-elf that automates SampleSheet generation
     from Google Sheets. And, of course, Dobby is free.
     """
     pass
 
-
 cli.add_command(cherrypick)
 cli.add_command(aggregate)
+cli.add_command(selector)
 
 if __name__ == "__main__":
     cli()
