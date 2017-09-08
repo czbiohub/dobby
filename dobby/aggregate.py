@@ -36,7 +36,7 @@ COLUMNS = ['Source well',
 
 def round_partial(value, resolution):
     """Round to a fraction of a number, e.g. to closest 0.25
-    
+
     From https://stackoverflow.com/a/8118808
     """
     return round(value/resolution) * resolution
@@ -51,7 +51,7 @@ def round_partial(value, resolution):
 @click.option('--output-folder', default='.',
               help="Folder to output the aggregated files to",
               type=click.Path(dir_okay=True, writable=True))
-@click.option('--desired-concentration', default=0.5, type=float,
+@click.option('--desired-concentration', default=0.3, type=float,
               help='Concentration in ng/ul')
 @click.option('--final-volume', default=400, type=int,
               help='Volume to dilute cDNA to')
@@ -62,12 +62,12 @@ def round_partial(value, resolution):
 def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
               final_volume=400, round_volume_to=ROUND_VOLUME_TO):
     """Glue together cherrypick files by 384 samples for an ECHO pick list
-    
+
     \b
     Parameters
     ----------
     filenames : str
-        Tidy files created by "dobby cherrypick" to aggregate 
+        Tidy files created by "dobby cherrypick" to aggregate
     """
     mass = desired_concentration * final_volume
 
@@ -134,5 +134,3 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
         click.echo("{n} samples from ({names}) didn't make it into a pick "
                    "list "
                    ":(".format(n=aggregated.shape[0], names=', '.join(seen)))
-
-
