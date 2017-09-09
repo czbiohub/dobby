@@ -78,7 +78,9 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    for filename in filenames:
+    last_file = len(filenames) - 1
+
+    for file_index, filename in enumerate(filenames):
         seen.append(filename)
         df = pd.read_csv(filename)
         df = df.sort_values(['row_letter', 'column_number'])
@@ -88,7 +90,8 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
         to_keep = df.iloc[(end_row+1):]
         aggregated = pd.concat([aggregated, to_add])
 
-        if aggregated.shape[0] == plate_size:
+
+        if aggregated.shape[0] == plate_size or file_index == last_file:
             aggregated = aggregated.rename(
                 columns={"well": "Source well", 'concentration': 'C(ng/ul)',
                          'plate': 'Plate number', 'name': "Name", })
@@ -111,12 +114,20 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
             aggregated['Rounded Buffer V'] = final_volume - \
                                              aggregated['Rounded Sample V']
 
-            aggregated['Destination well'] = DESTINATIONS
+            well_names = DESTINATIONS
+            if file_index == last_file:
+                last_index = len(aggregated['Rounded Buffer V'])
+                well_names = DESTINATIONS[:last_index]
+
+            aggregated['Destination well'] = well_names
 
             # Reorder the columns
             aggregated = aggregated[COLUMNS]
 
             basename = 'echo_picklist_{}.csv'.format(str(i).zfill(5))
+
+            if file_index == last_file:
+                basename = 'echo_picklist_{}_incomplete.csv'.format(str(i).zfill(5))
             csv = os.path.join(output_folder, basename)
             aggregated.to_csv(csv, index=False)
 
