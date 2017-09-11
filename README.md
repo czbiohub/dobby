@@ -154,3 +154,20 @@ Wrote 2 files (/home/dobby/googledrive/MACA/384W_QC/plate_reader/raw_plate_reade
 $ dobby samplesheet --output-folder test_samplesheet test_aggregate/echo_picklist_00015.csv XT-C-04
 Wrote test_samplesheet/echo_picklist_00015_samplesheet.csv
 ```
+
+The samplesheet should then look like this:
+
+
+```
+$ head test_samplesheet/echo_picklist_00015_samplesheet.csv
+SampleID,i7_index_name,i7_index,i5_index_name,i5_index
+A3-B003285-3_38_F-1-1,NEXT-i7-IDT-1,CTGATCGT,NEXT-i5-IDT-81,TAACGTCG
+A4-B003285-3_38_F-1-1,NEXT-i7-IDT-193,CTTCGTTC,NEXT-i5-IDT-273,GCCAGAAT
+A5-B003285-3_38_F-1-1,NEXT-i7-IDT-2,ACTCTCGA,NEXT-i5-IDT-82,AAGGCGTA
+A6-B003285-3_38_F-1-1,NEXT-i7-IDT-194,GTCTAGGT,NEXT-i5-IDT-274,CGAGAGAA
+A7-B003285-3_38_F-1-1,NEXT-i7-IDT-3,TGAGCTAG,NEXT-i5-IDT-83,TCTTACGG
+A8-B003285-3_38_F-1-1,NEXT-i7-IDT-195,ACGTCGTA,NEXT-i5-IDT-275,AACTCGGA
+A12-B003285-3_38_F-1-1,NEXT-i7-IDT-4,GAGACGAT,NEXT-i5-IDT-84,CGTGTGAT
+A15-B003285-3_38_F-1-1,NEXT-i7-IDT-196,GAGCTCAA,NEXT-i5-IDT-276,ACAGTTCG
+A16-B003285-3_38_F-1-1,NEXT-i7-IDT-5,CTTGTCGA,NEXT-i5-IDT-85,AACAGGTG
+```
