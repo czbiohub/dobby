@@ -70,5 +70,5 @@ def samplesheet(filename, template_name, sample_id_col, output_folder):
     csv = os.path.join(output_folder,
                        basename.replace('.csv', '_samplesheet.csv'))
     maybe_make_directory(csv)
-    template.to_csv(csv)
+    template.to_csv(csv, index=False)
     print(f'Wrote {csv}')
