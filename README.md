@@ -26,7 +26,11 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  cherrypick  Convert concentrations --> ECHO pick list
+  aggregate    Collect cherrypicked files into 384-well ECHO pick list ready
+               files
+  cherrypick   Use 384-well plate reader fluorescence to choose only cells
+               with high enough signals
+  samplesheet  Create an Illumina sample sheet using a template
 ```
 
 ### Outputs
@@ -89,7 +93,7 @@ Wrote cherrypicked ECHO pick list to test_output/cherrypicked/MAA000154_echo.csv
 Wrote non_cherrypicked ECHO pick list to test_output/non_cherrypicked/MAA000154_echo.csv
 ```
 
-### Example: Aggergate
+### Example: Aggregate
 
 
 
@@ -142,4 +146,11 @@ Wrote 4 files (/home/dobby/googledrive/MACA/384W_QC/plate_reader/raw_plate_reade
 Wrote 2 files (/home/dobby/googledrive/MACA/384W_QC/plate_reader/raw_plate_reader_output/3_Month/cherrypicked/MAA000927_echo.csv, /home/dobby/googledrive/MACA/384W_QC/plate_reader/raw_plate_reader_output/3_Month/cherrypicked/MAA000930_echo.csv) to /home/dobby/googledrive/MACA/cDNA Pick Lists/3_month/echo_picklist_00038.csv
 Wrote 2 files (/home/dobby/googledrive/MACA/384W_QC/plate_reader/raw_plate_reader_output/3_Month/cherrypicked/MAA000938_echo.csv, /home/dobby/googledrive/MACA/384W_QC/plate_reader/raw_plate_reader_output/3_Month/cherrypicked/MAA000944_echo.csv) to /home/dobby/googledrive/MACA/cDNA Pick Lists/3_month/echo_picklist_00039.csv
 (0) files () didn't make it into a pick list :(
+```
+
+### Example: Samplesheet
+
+```
+$ dobby samplesheet --output-folder test_samplesheet test_aggregate/echo_picklist_00015.csv XT-C-04
+Wrote test_samplesheet/echo_picklist_00015_samplesheet.csv
 ```
