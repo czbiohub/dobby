@@ -292,6 +292,12 @@ def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
     return without_standards_or_blanks
 
 
+def _make_pick_list_filename(output_folder, datatype, plate_name):
+    csv = os.path.join(output_folder, datatype, f'{plate_name}_echo.csv')
+    maybe_make_directory(csv)
+    return csv
+
+
 def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
                             output_folder='.'):
     # Convert 2d matrix into tall, tidy dataframe
@@ -307,8 +313,7 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
     echo_picks['name'] = echo_picks.apply(
         lambda x: '{well}-{plate}-{mouse_id}-1'.format(**x),
         axis=1)
-    csv = os.path.join(output_folder, datatype, f'{plate_name}_echo.csv')
-    maybe_make_directory(csv)
+    csv = _make_pick_list_filename(output_folder, datatype, platename)
     echo_picks.to_csv(csv, index=False)
     print(f'Wrote {datatype} ECHO pick list to {csv}')
     return csv
@@ -371,6 +376,7 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
 
     fluorescence = _parse_fluorescence(filename, filetype)
 
+
     concentrations, means, regressed = _fluorescence_to_concentration(
         fluorescence, standards_col, standards, output_folder=output_folder,
         inner=inner_standards, r_minimum=r_minimum)
@@ -384,6 +390,12 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
         concentrations_minimum, concentrations_maximum,
         regressed, r_minimum, output_folder, plate_name, mouse_id)
 
+    picklist_csv = _make_pick_list_filename(output_folder, 'cherrypicked',
+                                            plate_name)
+    if os.path.exists(picklist_csv):
+        print(f'\t{plate_name} already cherrypicked, skipping ...')
+        return
+
     if plot:
         _plot_regression(means, regressed, plate_name,
                          output_folder=output_folder)
@@ -392,6 +404,7 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
                  fmt='.1f', title_suffix=' (in 100,000 fluorescence units)')
         _heatmap(concentrations, plate_name, 'concentrations', output_folder,
                  fmt='.1f', vmin=0, vmax=1)
+
 
     _transform_to_pick_list(good_cells, plate_name, mouse_id, 'cherrypicked',
                             output_folder=output_folder)
