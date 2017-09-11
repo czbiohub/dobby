@@ -1,12 +1,22 @@
 # dobby
 Dobby is the heroic house-elf that automates SampleSheet generation from Google Sheets
 
+# install
+Install Anaconda https://www.anaconda.com/download/. Maker sure to add it to your path
+
+```
+conda create --yes -n dobby pandas jupyter six matplotlib seaborn scipy python=3.6
+source activate dobby
+pip install -e .
+make test-cli
+```
+
 ## Usage
 
 To get help on how to use `dobby`, use the command `dobby -h`:
 
 ```
-$ dobby -h 
+$ dobby -h
 Usage: dobby  <command>
 
   Hi! Dobby is the heroic house-elf that automates SampleSheet generation
@@ -47,8 +57,8 @@ Usage: dobby cherrypick [OPTIONS] FILENAME PLATE_NAME MOUSE_ID
 
   Transform plate of cDNA fluorescence to ECHO pick list
 
-  Parameters 
-  ---------- 
+  Parameters
+  ----------
   filename : str
        Name of the cDNA fluorescence 384 well QC output plate_name mouse_id filetype standards_col blanks_col
   standards plot output_folder
