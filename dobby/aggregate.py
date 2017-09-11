@@ -1,3 +1,4 @@
+import glob
 import os
 import string
 import warnings
@@ -14,6 +15,7 @@ ROWS = string.ascii_uppercase[:16]
 COLS = range(1, 25)
 
 ROUND_VOLUME_TO = 0.5
+PICKLIST_PREFIX = 'echo_picklist_'
 
 DESTINATIONS = [f'{row}{col}' for row in ROWS for col in COLS]
 
@@ -42,6 +44,30 @@ def round_partial(value, resolution):
     return round(value/resolution) * resolution
 
 
+def _picklist_basename(picklist_number):
+    """Create picklist filename from the number sheet we're on"""
+    n = str(picklist_number).zfill(5)
+    return f'{PICKLIST_PREFIX}{n}.csv'
+
+
+def _read_existing_picklists(folder):
+    """Aggregate existing picklists into a 'database'"""
+    dfs = []
+    done_picklists = glob.iglob(os.path.join(folder,
+                                             PICKLIST_PREFIX + "*.csv"))
+    for filename in done_picklists:
+        df = pd.read_csv(filename)
+        basename = os.path.basename(filename)
+        prefix, extension = basename.split('.')
+        *prefix, number = prefix.split('_')
+        number = int(number)
+        df['number'] = number
+        dfs.append(df)
+
+    picklisted = pd.concat(dfs)
+    return picklisted
+
+
 @click.command(short_help="Collect cherrypicked files into 384-well ECHO pick "
                           "list ready files")
 @click.argument('filenames', nargs=-1,
@@ -59,8 +85,10 @@ def round_partial(value, resolution):
               help="Many machines can't produce volumes of any precision, so "
                    "this ensures that the final volumes are rounded to a "
                    "usable number")
+@click.option('--force', is_flag=True,
+              help="If specified, overwrite existing picklists")
 def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
-              final_volume=400, round_volume_to=ROUND_VOLUME_TO):
+              final_volume=400, round_volume_to=ROUND_VOLUME_TO, force=False):
     """Glue together cherrypick files by 384 samples for an ECHO pick list
     
     \b
@@ -69,19 +97,73 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
     filenames : str
         Tidy files created by "dobby cherrypick" to aggregate 
     """
+    click.echo(f'Reading exising pick lists in {output_folder} ...')
+
+
+    picklisted = None
+    picklist_number = 0
+    picked_plates = set([])
+
+    try:
+        picklisted = _read_existing_picklists(output_folder)
+        picklist_number = picklisted['number'].max()
+        picked_plates = set(picklisted['Plate number'].unique())
+    except ValueError:
+        # No objects to concatenate -- no picklist files in the output folder
+        pass
+
+    click.echo(f'\tDone. {picklist_number} picklists found.')
+
+    if force:
+        picklisted = None
+        picklist_number = 0
+        picked_plates = set([])
+        click.echo(f'--force set: Overwriting existing {picklist_number} '
+                   f'picklists.')
+
     mass = desired_concentration * final_volume
 
     aggregated = pd.DataFrame()
     seen = []
-    i = 0
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
     for filename in filenames:
-        seen.append(filename)
+        platename = os.path.basename(filename).split('.')[0].split()[0].split('_')[0]
+
+        samples = []
+        if picklisted is not None and platename in picked_plates:
+            rows = picklisted['Plate number'] == platename
+            plate_picklist = picklisted.loc[rows]
+            plate_list_numbers = plate_picklist['number'].unique()
+            plate_list_number_max = plate_list_numbers.max()
+            samples = plate_picklist['Combined name']
+
+            picklist_basenames = ','.join(map(_picklist_basename,
+                                              plate_list_numbers))
+
+            # Remove sequential -1-1 and make sure only one -1 is left
+            samples = [x.rstrip('-1') + '-1' for x in samples]
+
+            if plate_list_number_max < picklist_number:
+                click.echo(f'Already saw {platename} in '
+                           f'{picklist_basenames}, skipping ...')
+                continue
+
+        seen.append(os.path.basename(filename))
         df = pd.read_csv(filename)
         df = df.sort_values(['row_letter', 'column_number'])
+        # If this plate was in the very last picklist, see if any samples are
+        # left over and need to be put into the next picklist
+        if samples:
+            remaining_rows = ~df['name'].isin(samples)
+            n_remaining = remaining_rows.sum()
+            n_samples = len(samples)
+            click.echo(f'\tAlready wrote {n_samples} samples to '
+                       f'{picklist_basenames}, {n_remaining} samples remaining'
+                       f' for next picklist')
+            df = df.loc[remaining_rows]
 
         end_row = plate_size-aggregated.shape[0]
         to_add = df.iloc[:end_row]
@@ -116,15 +198,15 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration=0.5,
             # Reorder the columns
             aggregated = aggregated[COLUMNS]
 
-            basename = 'echo_picklist_{}.csv'.format(str(i).zfill(5))
-            csv = os.path.join(output_folder, basename)
+            picklist_basename = _picklist_basename(picklist_number)
+            csv = os.path.join(output_folder, picklist_basename)
             aggregated.to_csv(csv, index=False)
 
             click.echo('Wrote {n} files ({names}) to {csv}'.format(
                 n=len(seen), names=', '.join(seen), csv=csv))
 
             # Increment the sheet number
-            i += 1
+            picklist_number += 1
 
             # Reset the filename keepers and growing datafarame
             seen = [filename]
