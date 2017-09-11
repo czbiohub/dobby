@@ -30,7 +30,7 @@ BLANKS_COL = 23
 
 CONCENTRATIONS_MINIMUM = 0.7
 CONCENTRATIONS_MAXIMUM = 10
-R_MINIMUM = 0.98
+R2_MINIMUM = 0.98
 
 FLAGGED = 'flagged'
 
@@ -80,7 +80,7 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
     ax.legend()
 
     # :.5 indicates 5 decimal places
-    plt.title(f'$R^2$ = {regressed.rvalue:.5}')
+    plt.title('$R^2$ = {r:.5}'.format(r=regressed.rvalue**2))
 
     pdf = os.path.join(output_folder, 'regression',
                        f'{plate_name}_regression_lines.pdf')
@@ -138,7 +138,7 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
 
 
 def _fluorescence_to_concentration(fluorescence, standards_col, standards,
-                                   output_folder='.', r_minimum=R_MINIMUM,
+                                   output_folder='.', r2_minimum=R2_MINIMUM,
                                    inner=True):
     """Use standards column to regress and convert to concentrations"""
     standards = pd.Series(standards, index=fluorescence.index)
@@ -152,8 +152,8 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
     # Convert fluorescence to concentration
     concentrations = (fluorescence - regressed.intercept) / regressed.slope
 
-    if regressed.rvalue < r_minimum:
-        print(f'\tRegression failed test: {regressed.rvalue} < {r_minimum}')
+    if regressed.rvalue**2 < r2_minimum:
+        print(f'\tRegression failed test: {regressed.rvalue} < {r2_minimum}')
         output_folder = os.path.join(output_folder, 'failed')
 
     return concentrations, means, regressed
@@ -342,7 +342,7 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
               help='Minimum value (in ug/ml) of global concentrations for a '
                    'plate. If any cell in a plate is above this value, the '
                    'plate is flagged')
-@click.option('--r-minimum', default=R_MINIMUM,
+@click.option('--r-minimum', default=R2_MINIMUM,
               help='Minimum value of pearson correlation between regression '
                    'and standards lines')
 def cherrypick(filename, plate_name, mouse_id, filetype='txt',
@@ -352,7 +352,7 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
                inner_standards=True,
                concentrations_minimum=CONCENTRATIONS_MINIMUM,
                concentrations_maximum=CONCENTRATIONS_MAXIMUM,
-               r_minimum=R_MINIMUM):
+               r_minimum=R2_MINIMUM):
     """Transform plate of cDNA fluorescence to ECHO pick list
     
     \b
@@ -379,7 +379,7 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
 
     concentrations, means, regressed = _fluorescence_to_concentration(
         fluorescence, standards_col, standards, output_folder=output_folder,
-        inner=inner_standards, r_minimum=r_minimum)
+        inner=inner_standards, r2_minimum=r_minimum)
 
     good_cells = _get_good_cells(concentrations, blanks_col, plate_name,
                                  mouse_id, output_folder=output_folder,
