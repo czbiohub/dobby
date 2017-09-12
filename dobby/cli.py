@@ -2,7 +2,7 @@ import click
 
 from dobby.cherrypick import cherrypick
 from dobby.aggregate import aggregate
-from dobby.selector import selector
+# from dobby.selector import selector
 from dobby.samplesheet import samplesheet
 
 settings = dict(help_option_names=['-h', '--help'])
@@ -19,7 +19,7 @@ def cli():
 
 cli.add_command(cherrypick)
 cli.add_command(aggregate)
-cli.add_command(selector)
+# cli.add_command(selector)
 cli.add_command(samplesheet)
 
 if __name__ == "__main__":
