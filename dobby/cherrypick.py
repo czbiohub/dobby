@@ -313,7 +313,7 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
     echo_picks['name'] = echo_picks.apply(
         lambda x: '{well}-{plate}-{mouse_id}-1'.format(**x),
         axis=1)
-    csv = _make_pick_list_filename(output_folder, datatype, platename)
+    csv = _make_pick_list_filename(output_folder, datatype, plate_name)
     echo_picks.to_csv(csv, index=False)
     print(f'Wrote {datatype} ECHO pick list to {csv}')
     return csv
