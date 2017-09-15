@@ -171,3 +171,46 @@ A12-B003285-3_38_F-1-1,NEXT-i7-IDT-4,GAGACGAT,NEXT-i5-IDT-84,CGTGTGAT
 A15-B003285-3_38_F-1-1,NEXT-i7-IDT-196,GAGCTCAA,NEXT-i5-IDT-276,ACAGTTCG
 A16-B003285-3_38_F-1-1,NEXT-i7-IDT-5,CTTGTCGA,NEXT-i5-IDT-85,AACAGGTG
 ```
+
+### Example: Samplesheet within IPython terminal
+
+Here's an example iterating over many files and templates:
+
+```
+In [9]: templates = ['XT-C-01',
+   ...:  'XT-C-02',
+   ...:  'XT-C-03',
+   ...:  'XT-C-04',
+   ...:  'XT-C-05',
+   ...:  'XT-C-06',
+   ...:  'XT-C-07',
+   ...:  'XT-C-08',
+   ...:  'XT-C-09',
+   ...:  'XT-C-10',
+   ...:  'XT-C-11',
+   ...:  'XT-C-12',
+   ...:  'XT-C-13',
+   ...:  'XT-C-14',
+   ...:  'XT-C-15',
+   ...:  'XT-C-16',
+   ...:  'XT-C-17',
+   ...:  'XT-C-18',
+   ...:  'XT-C-19',
+   ...:  'XT-C-20']
+   ...:
+
+In [10]: i = 0
+
+In [11]: filenames = ! ls ~/googledrive/MACA/cdna_pick_lists/3_month/echo40-59/*.csv
+
+In [12]: output_folder = '/home/dobby/googledrive/MACA/sequencing_prep/samplesheets_from_dobby/NovaSeq3'
+
+In [13]: for filename in filenames:
+    ...:     template = templates[i]
+    ...:     ! dobby samplesheet --output-folder "$output_folder"  $filename $template
+    ...:     i += 1
+    ...:     if i >= 20:
+    ...:         i = 0
+    ...:
+
+```
