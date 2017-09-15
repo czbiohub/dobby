@@ -17,7 +17,6 @@ ROUND_VOLUME_TO = 0.5
 
 DESTINATIONS = [f'{row}{col}' for row in ROWS for col in COLS]
 
-
 COLUMNS = ['Source well',
  'Plate number',
  'Name',
@@ -46,8 +45,8 @@ def round_partial(value, resolution):
                           "list ready files")
 @click.argument('filenames', nargs=-1,
                 type=click.Path(dir_okay=False, readable=True))
-@click.option('--plate-size', type=int, default=PLATE_SIZE,
-              help='Number of samples in the final plate')
+@click.option('--incomplete-echopicklists-folder',
+                type=click.Path(dir_okay=True, file_okay=False, readable=True))
 @click.option('--output-folder', default='.',
               help="Folder to output the aggregated files to",
               type=click.Path(dir_okay=True, writable=True))
@@ -59,7 +58,7 @@ def round_partial(value, resolution):
               help="Many machines can't produce volumes of any precision, so "
                    "this ensures that the final volumes are rounded to a "
                    "usable number")
-def aggregate(filenames, plate_size, output_folder, desired_concentration,
+def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired_concentration,
               final_volume=400, round_volume_to=ROUND_VOLUME_TO):
     """Glue together cherrypick files by 384 samples for an ECHO pick list
 
@@ -69,66 +68,134 @@ def aggregate(filenames, plate_size, output_folder, desired_concentration,
     filenames : str
         Tidy files created by "dobby cherrypick" to aggregate
     """
-    aggregated = pd.DataFrame()
-    sheet_number = 0
-
     if not os.path.exists(output_folder):
+        # dobby aggregate test/aggregate_input/* --output-folder test/aggregate_output/ --incomplete-echopicklists test/incomplete_input_aggregate/*
         os.makedirs(output_folder)
 
-    last_file = len(filenames) - 1
+    plate_num = 0
+    cherrypick_file_start = 0
+    starting_dataframe = pd.DataFrame()
+    left_over_dataframe = pd.DataFrame()
 
-    for file_index, filename in enumerate(filenames):
-        df = pd.read_csv(filename)
-        df = df.sort_values(['row_letter', 'column_number'])
+    if incomplete_echopicklists_folder:
+        incomplete_echopiclist_files = file_rel_paths(incomplete_echopicklists_folder)
 
-        rows_filled = aggregated.shape[0]
-        end_row_index = plate_size - rows_filled
-        add_now = df.iloc[:end_row_index]
-        add_next_time = df.iloc[(end_row_index):] # this +1 should not be here
-        aggregated = pd.concat([aggregated, add_now])
+        incomplete_echopicklist_dataframes = dataframe_generator(incomplete_echopiclist_files)
+        incomplete_echopicklist_dataframes_ofsize = dataframes_ofsize_generator(incomplete_echopicklist_dataframes, PLATE_SIZE)
+        for echopicklist_dataframe_ofsize, is_lessthan_desired_size, files_used, left_over_dataframe in incomplete_echopicklist_dataframes_ofsize:
+            if not is_lessthan_desired_size:
+                write_csv_from_dataframe(echopicklist_dataframe_ofsize, plate_num, output_folder, is_lessthan_desired_size)
+                plate_num +=1
+                return # all concatenated incomplete echopicklists make
 
-        is_last_file = file_index == last_file
-        is_complete_platesize = aggregated.shape[0] == plate_size
-        # end_on_incomplete_sheet = (file_index == last_file and add_next_time.shape[0] != 0)
-        if is_complete_platesize or is_last_file:
-            is_partial_sheet = (is_last_file and not is_complete_platesize)
-            formatted_echopick_sheet = format_for_echopick(
-                aggregated,
+        # if there is an echopick list that is not the full size
+        incomplete_echopicklist = echopicklist_dataframe_ofsize
+        rows_to_complete = PLATE_SIZE - incomplete_echopicklist.shape[0]
+
+        # bottom dataframe
+        dataframes = dataframe_generator(filenames[cherrypick_file_start:])
+        dataframes_ofsize = dataframes_ofsize_generator(dataframes, rows_to_complete, starting_dataframe)
+        dataframe, is_lessthan_desired_size, files_used, left_over_dataframe = next(dataframes_ofsize)
+        is_lessthan_desired_size = True
+        formatted_echopick_list = format_echopicklist(
+            dataframe,
+            desired_concentration,
+            final_volume,
+            round_volume_to,
+            is_lessthan_desired_size)
+
+        complete = pd.concat([incomplete_echopicklist, formatted_echopick_list])
+        cherrypick_file_start = files_used
+        #make csv file
+        write_csv_from_dataframe(complete, plate_num, output_folder)
+        #increment the plate_num
+        plate_num +=1
+
+        if files_used == len(filenames) and left_over_dataframe.shape[0] > 0:
+            is_lessthan_desired_size = True
+            formatted_echopick_list = format_echopicklist(
+                left_over_dataframe,
                 desired_concentration,
                 final_volume,
                 round_volume_to,
-                is_partial_sheet)
+                is_lessthan_desired_size)
 
-            write_csv_from_dataframe(formatted_echopick_sheet, sheet_number, output_folder, is_partial_sheet)
-            # Increment the sheet number
-            sheet_number += 1
+            #make csv file
+            write_csv_from_dataframe(formatted_echopick_list, plate_num, output_folder, is_lessthan_desired_size)
+            return
 
-            # Reset the filename keepers and growing datafarame
+
+    dataframes = dataframe_generator(filenames[cherrypick_file_start:])
+    if not left_over_dataframe.empty:
+        starting_dataframe = left_over_dataframe
+    dataframes_ofsize = dataframes_ofsize_generator(dataframes, PLATE_SIZE, starting_dataframe)
+
+    for dataframe, is_lessthan_desired_size, files_used, left_over_dataframe in dataframes_ofsize:
+        formatted_echopick_list = format_echopicklist(
+            dataframe,
+            desired_concentration,
+            final_volume,
+            round_volume_to,
+            is_lessthan_desired_size)
+
+        write_csv_from_dataframe(formatted_echopick_list, plate_num, output_folder, is_lessthan_desired_size)
+        # Increment the plate number
+        plate_num += 1
+
+def dataframe_generator(files):
+    for f in files:
+        yield pd.read_csv(f)
+
+
+def file_rel_paths(directory):
+    rel_paths = []
+    for f in os.listdir(directory):
+        rel_paths.append(os.path.join(directory, f))
+    return rel_paths
+
+
+def dataframes_ofsize_generator(dataframes_generator, desired_size, starting_dataframe=None):
+    dataframes_used = 0
+    aggregated = pd.DataFrame()
+    if starting_dataframe is not None:
+        aggregated = starting_dataframe
+
+    for dataframe in dataframes_generator:
+        dataframes_used +=1
+        rows_filled = aggregated.shape[0]
+        end_row_index = desired_size - rows_filled
+        add_now = dataframe.iloc[:end_row_index]
+        add_next_time = dataframe.iloc[end_row_index:]
+        aggregated = pd.concat([aggregated, add_now])
+        is_complete_platesize = aggregated.shape[0] == desired_size
+        if is_complete_platesize:
+            is_lessthan_desired_size = not is_complete_platesize
+            yield aggregated, is_lessthan_desired_size, dataframes_used, add_next_time
+
             aggregated = add_next_time
 
-            rows_leftover_from_lastfile = add_next_time.shape[0]
-            if is_last_file and rows_leftover_from_lastfile > 0:
-                formatted_echopick_sheet = format_for_echopick(
-                    aggregated,
-                    desired_concentration,
-                    final_volume,
-                    round_volume_to,
-                    True)
-
-                write_csv_from_dataframe(formatted_echopick_sheet, sheet_number, output_folder, True)
+    if aggregated.shape[0] > 0:
+        is_lessthan_desired_size = True
+        yield aggregated, is_lessthan_desired_size, dataframes_used, add_next_time
 
 
-def write_csv_from_dataframe(dataframe, sheet_number, output_folder, is_partial_sheet=False):
+def write_csv_from_dataframe(dataframe, plate_num, output_folder, is_incomplete_plate=False):
     #generate_file
-    basename = 'echo_picklist_{}.csv'.format(str(sheet_number).zfill(5))
-    if is_partial_sheet:
-        basename = 'echo_picklist_{}_incomplete.csv'.format(str(sheet_number).zfill(5))
+    basename = 'echo_picklist_{}.csv'.format(str(plate_num).zfill(5))
+    if is_incomplete_plate:
+        basename = 'echo_picklist_{}_incomplete.csv'.format(str(plate_num).zfill(5))
     csv = os.path.join(output_folder, basename)
     dataframe.to_csv(csv, index=False)
 
 
-def format_for_echopick(aggregated,desired_concentration,final_volume,round_volume_to,is_partial_sheet=False):
+def format_echopicklist(
+        aggregated,
+        desired_concentration,
+        final_volume,
+        round_volume_to,
+        is_incomplete_plate=False):
     mass = desired_concentration * final_volume
+    aggregated = aggregated.sort_values(['row_letter', 'column_number'])
     aggregated = aggregated.rename(
      columns={"well": "Source well", 'concentration': 'C(ng/ul)',
               'plate': 'Plate number', 'name': "Name", })
@@ -152,12 +219,11 @@ def format_for_echopick(aggregated,desired_concentration,final_volume,round_volu
                                   aggregated['Rounded Sample V']
 
     well_names = DESTINATIONS
-    if is_partial_sheet: #TODO
+    if is_incomplete_plate:
         last_index = len(aggregated['Rounded Buffer V'])
         well_names = DESTINATIONS[:last_index]
 
     aggregated['Destination well'] = well_names
-
     # Reorder the columns
     aggregated = aggregated[COLUMNS]
 
