@@ -92,8 +92,8 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
         incomplete_echopicklist = echopicklist_dataframe_ofsize
         rows_to_complete = PLATE_SIZE - incomplete_echopicklist.shape[0]
 
-        # bottom dataframe
-        dataframes = dataframe_generator(filenames[cherrypick_file_start:])
+        # complete incomplete echopicklist with cherrypicklists
+        dataframes = dataframe_generator(filenames[cherrypick_file_start:], should_sort=True)
         dataframes_ofsize = dataframes_ofsize_generator(dataframes, rows_to_complete, starting_dataframe)
         dataframe, is_lessthan_desired_size, files_used, left_over_dataframe = next(dataframes_ofsize)
         is_lessthan_desired_size = True
@@ -125,7 +125,7 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
             return
 
 
-    dataframes = dataframe_generator(filenames[cherrypick_file_start:])
+    dataframes = dataframe_generator(filenames[cherrypick_file_start:], should_sort=True)
     if not left_over_dataframe.empty:
         starting_dataframe = left_over_dataframe
     dataframes_ofsize = dataframes_ofsize_generator(dataframes, PLATE_SIZE, starting_dataframe)
@@ -142,9 +142,13 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
         # Increment the plate number
         plate_num += 1
 
-def dataframe_generator(files):
+def dataframe_generator(files, should_sort=False):
     for f in files:
-        yield pd.read_csv(f)
+        data_frame = pd.read_csv(f)
+        if should_sort:
+            yield data_frame.sort_values(['row_letter', 'column_number'])
+        else:
+            yield data_frame
 
 
 def file_rel_paths(directory):
@@ -195,7 +199,6 @@ def format_echopicklist(
         round_volume_to,
         is_incomplete_plate=False):
     mass = desired_concentration * final_volume
-    aggregated = aggregated.sort_values(['row_letter', 'column_number'])
     aggregated = aggregated.rename(
      columns={"well": "Source well", 'concentration': 'C(ng/ul)',
               'plate': 'Plate number', 'name': "Name", })
