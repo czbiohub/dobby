@@ -7,6 +7,7 @@ import pandas as pd
 from .util import maybe_make_directory
 
 TEMPLATE_SAMPLE_ID_COL = 'SampleID'
+TEMPLATE_SAMPLE_NAME_COL = 'Sample_Name'
 
 TEMPLATE_FOLDER = os.path.join(os.path.dirname(__file__),
                                'samplesheet_templates')
@@ -62,9 +63,11 @@ def samplesheet(filename, template_name, sample_id_col, output_folder):
 
     input_df = pd.read_csv(filename)
     samples = input_df[sample_id_col]
+    #import ipdb ; ipdb.set_trace()
 
     template = _get_template(template_name)
     template[TEMPLATE_SAMPLE_ID_COL] = samples
+    template[TEMPLATE_SAMPLE_NAME_COL] = samples
 
     basename = os.path.basename(filename)
     csv = os.path.join(output_folder,
