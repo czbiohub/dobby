@@ -33,6 +33,20 @@ Commands:
   samplesheet  Create an Illumina sample sheet using a template
 ```
 
+# Running tests
+Make sure you're in a dobby environment
+
+```
+cd test
+python -m unittest test_cherrypick
+```
+
+to run just one test
+
+```
+python -m unittest test_cherrypick.TestCherrypick.test_2_flagged
+```
+
 ### Outputs
 
 Dobby outputs to the following folders:

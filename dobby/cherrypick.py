@@ -1,6 +1,7 @@
 import os
 import string
 import warnings
+import time
 
 import click
 import matplotlib as mpl
@@ -33,6 +34,8 @@ CONCENTRATIONS_MAXIMUM = 10
 R_MINIMUM = 0.98
 
 FLAGGED = 'flagged'
+FLAG_FOLDER_PREFIX = 'flag'
+RECORD_FILE = 'record_plate_flagged_timestamp.csv'
 
 
 def _parse_standards(standards_str):
@@ -94,7 +97,7 @@ def _plot_regression(means, regressed, plate_name, output_folder='.'):
 def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
              drop_standards=True, **kwargs):
     """Draw a heatmap of values
-    
+
     Parameters
     ----------
     data : pandas.DataFrame
@@ -103,14 +106,14 @@ def _heatmap(data, plate_name, datatype, output_folder, title_suffix=None,
         Name of the plate
     datatype : str
         Type of data, e.g. "fluorescence" or "concentration"
-    output_folder : str 
+    output_folder : str
         Location of the folder to output
     title_suffix : str
         Additional information to add to the title
     drop_standards : bool
-        If True, then remove the 24th column which contains standard 
+        If True, then remove the 24th column which contains standard
         concentrations for plotting
-    kwargs 
+    kwargs
         Any other keyword arguments for seaborn.heatmap
 
     Returns
@@ -158,6 +161,47 @@ def _fluorescence_to_concentration(fluorescence, standards_col, standards,
 
     return concentrations, means, regressed
 
+def record_flagged_plate_and_determine_folder(output_folder,platename):
+    record_file_dir = os.path.join(output_folder, FLAGGED)
+    record_file_path = os.path.join(record_file_dir, RECORD_FILE)
+    number_of_times_flagged = 1
+
+    #if file doesn't exist make file and add line record for platename
+    if not os.path.exists(record_file_path):
+
+        if not os.path.exists(record_file_dir):
+            os.makedirs(record_file_dir)
+
+        with open(record_file_path, 'w') as record_file:
+            record_file.write(platename + ',' + timestamp() + '\n')
+
+    else: #file does exist
+        with open(record_file_path, 'r') as record_file:
+            record = record_file.readlines()
+
+        plate_in_file = False
+        for index_line, line in enumerate(record):
+            line_to_process = line.rstrip().split(',')
+            if platename == line_to_process[0]:
+                line_to_process.append(timestamp())
+                line_updated = ','.join(line_to_process) + '\n'
+                plate_in_file = True
+                number_of_times_flagged = len(line_to_process) - 1
+                break
+
+        if plate_in_file:
+            record[index_line] = line_updated
+        else:
+            record.append(platename + ',' + timestamp() + '\n')
+
+        with open(record_file_path, 'w') as record_file:
+            record_file.writelines( record )
+
+    flagged_folder = '%s_%s' % (FLAG_FOLDER_PREFIX, str(number_of_times_flagged))
+    return flagged_folder
+
+def timestamp():
+    return time.strftime('%Y-%m-%d %H:%M:%S')
 
 def _adjust_output_if_fail_sanity_check(concentrations, blanks_col,
                                         good_cells, concentrations_minimum,
@@ -173,31 +217,33 @@ def _adjust_output_if_fail_sanity_check(concentrations, blanks_col,
     checks = pass_regression, pass_blanks, pass_samples, pass_concentration
 
     if sum(checks) < len(checks):
-        return _append_flagged_output_folder(output_folder, 'repeat_flags',
+        flag_folder = record_flagged_plate_and_determine_folder(output_folder, platename)
+        return _append_flagged_output_folder(output_folder, flag_folder,
                                              'repeated flags', platename,
                                              mouse_id)
 
-    if not pass_regression:
-        output_folder = _append_flagged_output_folder(output_folder,
-                                                      '1stpass_regression',
-                                                      'regression', platename,
-                                                      mouse_id)
-    elif not pass_blanks:
-        output_folder = _append_flagged_output_folder(output_folder,
-                                                      '2ndpass_blanks',
-                                                      'blanks', platename,
-                                                      mouse_id)
-    elif not pass_samples:
-        output_folder = _append_flagged_output_folder(output_folder,
-                                                      '3rdpass_samples',
-                                                      'samples', platename,
-                                                      mouse_id)
-    elif not pass_concentration:
-        output_folder = _append_flagged_output_folder(output_folder,
-                                                      '4thpass_concentration',
-                                                      'concentration too high',
-                                                      platename,
-                                                      mouse_id)
+    #I don't think this actually ever gets used.
+    # if not pass_regression:
+    #     output_folder = _append_flagged_output_folder(output_folder,
+    #                                                   '1stpass_regression',
+    #                                                   'regression', platename,
+    #                                                   mouse_id)
+    # elif not pass_blanks:
+    #     output_folder = _append_flagged_output_folder(output_folder,
+    #                                                   '2ndpass_blanks',
+    #                                                   'blanks', platename,
+    #                                                   mouse_id)
+    # elif not pass_samples:
+    #     output_folder = _append_flagged_output_folder(output_folder,
+    #                                                   '3rdpass_samples',
+    #                                                   'samples', platename,
+    #                                                   mouse_id)
+    # elif not pass_concentration:
+    #     output_folder = _append_flagged_output_folder(output_folder,
+    #                                                   '4thpass_concentration',
+    #                                                   'concentration too high',
+    #                                                   platename,
+    #                                                   mouse_id)
     return output_folder
 
 
@@ -221,7 +267,7 @@ def _sanity_check_regression(regressed, r_minimum):
 
 def _sanity_check_blanks(concentrations, blanks_col):
     """Make sure all concentrations in blanks columns are positive
-    
+
     Returns
     -------
     True if sanity check passed
@@ -230,13 +276,13 @@ def _sanity_check_blanks(concentrations, blanks_col):
 
 
 def _sanity_check_standards(concentrations, standards, standards_col):
-    """Ensure that standards correspond to increasing concentrations 
-    
-    Check if wells with larger known concentrations have smaller measured 
+    """Ensure that standards correspond to increasing concentrations
+
+    Check if wells with larger known concentrations have smaller measured
     concentrations than wells with smaller known concentrations. E.g. if the 0
-    .5 concentrations wells were measured as smaller than the 0.25 
-    concentrations wells. 
-    
+    .5 concentrations wells were measured as smaller than the 0.25
+    concentrations wells.
+
     Returns
     -------
     True if sanity check passed
@@ -254,7 +300,7 @@ def _sanity_check_standards(concentrations, standards, standards_col):
 
 def _sanity_check_samples(good_cells, threshold=CONCENTRATIONS_MINIMUM):
     """Make sure the mean concentrations of the good cells is above 0.7
-    
+
     Returns
     -------
     True if sanity check passed
@@ -321,7 +367,8 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
 
 @click.command(short_help="Use 384-well plate reader fluorescence to choose "
                           "only cells with high enough signals")
-@click.argument('filename')
+@click.argument('filename', nargs=1,
+                type=click.Path(dir_okay=False, readable=True, file_okay=True))
 @click.argument('plate_name')
 @click.argument('mouse_id')
 @click.option('--filetype', default='txt')
@@ -354,7 +401,7 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
                concentrations_maximum=CONCENTRATIONS_MAXIMUM,
                r_minimum=R_MINIMUM):
     """Transform plate of cDNA fluorescence to ECHO pick list
-    
+
     \b
     Parameters
     ----------
@@ -370,12 +417,28 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
     -------
 
     """
+
+    main(filename, plate_name, mouse_id, output_folder=output_folder, plot=True)
+
+
+def main(filename,
+         plate_name,
+         mouse_id,
+         filetype='txt',
+         standards_col=STANDARDS_COL,
+         blanks_col=BLANKS_COL,
+         standards=STANDARDS_STR,
+         plot=True,
+         output_folder='.',
+         inner_standards=True,
+         concentrations_minimum=CONCENTRATIONS_MINIMUM,
+         concentrations_maximum=CONCENTRATIONS_MAXIMUM,
+         r_minimum=R_MINIMUM):
+
     standards = _parse_standards(standards)
     # plate_name = filename_to_plate_name(filename)
     # mouse_id = plate_name_to_mouse_id(plate_name)
-
     fluorescence = _parse_fluorescence(filename, filetype)
-
 
     concentrations, means, regressed = _fluorescence_to_concentration(
         fluorescence, standards_col, standards, output_folder=output_folder,
