@@ -1,12 +1,15 @@
 import os
 import string
 import warnings
+import uuid
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import pandas as pd
 
 import click
+
+OUTPUT_INCOMPLETE_ECHOPICKLIST_FOLDER = 'incomplete_echopicklist_output'
 
 PLATE_SIZE = 384
 
@@ -185,10 +188,14 @@ def dataframes_ofsize_generator(dataframes_generator, desired_size, starting_dat
 
 def write_csv_from_dataframe(dataframe, plate_num, output_folder, is_incomplete_plate=False):
     #generate_file
-    basename = 'echo_picklist_{}.csv'.format(str(plate_num).zfill(5))
-    if is_incomplete_plate:
-        basename = 'echo_picklist_{}_incomplete.csv'.format(str(plate_num).zfill(5))
+    basename = 'echo_picklist_{}.csv'.format(str(uuid.uuid4().hex))
     csv = os.path.join(output_folder, basename)
+    if is_incomplete_plate:
+        if not os.path.exists(OUTPUT_INCOMPLETE_ECHOPICKLIST_FOLDER):
+            os.makedirs(OUTPUT_INCOMPLETE_ECHOPICKLIST_FOLDER)
+        basename = 'echo_picklist_{}_incomplete.csv'.format(str(uuid.uuid4().hex))
+        csv = os.path.join(OUTPUT_INCOMPLETE_ECHOPICKLIST_FOLDER, basename)
+
     dataframe.to_csv(csv, index=False)
 
 
