@@ -17,6 +17,10 @@ ROUND_VOLUME_TO = 0.5
 
 DESTINATIONS = [f'{row}{col}' for row in ROWS for col in COLS]
 
+DESIRED_CONCENTRATION = 0.3 #ng/ul
+
+FINALVOLUME = 400
+
 COLUMNS = ['Source well',
  'Plate number',
  'Name',
@@ -32,6 +36,30 @@ COLUMNS = ['Source well',
  'Rounded Buffer V',
  'Destination well']
 
+def echo_picklist_number(filename):
+    if filename.startswith("echo_picklist_") and filename.endswith(".csv"):
+        number_and_extension = filename.split("_")[2]
+        number = number_and_extension.split(".")[0]
+        if number.isdigit():
+            return number.strip("0")
+        else:
+            return False
+    return False
+
+
+def largest_enumeration_in_outputfolder(output_folder):
+    maximum_number = 0
+    numbers = []
+    for f in os.listdir(output_folder):
+        num = echo_picklist_number(f)
+        if num:
+            numbers.append(int(num))
+        else:
+            print("WARNING: %s not a valid echo_picklist file, remove from this directory" % (f))
+
+    if numbers:
+        maximum_number = max(numbers)
+    return maximum_number
 
 def round_partial(value, resolution):
     """Round to a fraction of a number, e.g. to closest 0.25
@@ -50,16 +78,7 @@ def round_partial(value, resolution):
 @click.option('--output-folder', default='.',
               help="Folder to output the aggregated files to",
               type=click.Path(dir_okay=True, writable=True))
-@click.option('--desired-concentration', default=0.3, type=float,
-              help='Concentration in ng/ul')
-@click.option('--final-volume', default=400, type=int,
-              help='Volume to dilute cDNA to')
-@click.option('--round-volume-to', default=ROUND_VOLUME_TO,
-              help="Many machines can't produce volumes of any precision, so "
-                   "this ensures that the final volumes are rounded to a "
-                   "usable number")
-def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired_concentration,
-              final_volume=400, round_volume_to=ROUND_VOLUME_TO):
+def aggregate(filenames, incomplete_echopicklists_folder, output_folder):
     """Glue together cherrypick files by 384 samples for an ECHO pick list
 
     \b
@@ -72,7 +91,7 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
         # dobby aggregate test/aggregate_input/* --output-folder test/aggregate_output/ --incomplete-echopicklists test/incomplete_input_aggregate/*
         os.makedirs(output_folder)
 
-    plate_num = 0
+    plate_num = largest_enumeration_in_outputfolder(output_folder) + 1
     cherrypick_file_start = 0
     starting_dataframe = pd.DataFrame()
     left_over_dataframe = pd.DataFrame()
@@ -99,9 +118,6 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
         is_lessthan_desired_size = True
         formatted_echopick_list = format_echopicklist(
             dataframe,
-            desired_concentration,
-            final_volume,
-            round_volume_to,
             is_lessthan_desired_size)
 
         complete = pd.concat([incomplete_echopicklist, formatted_echopick_list])
@@ -115,9 +131,6 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
             is_lessthan_desired_size = True
             formatted_echopick_list = format_echopicklist(
                 left_over_dataframe,
-                desired_concentration,
-                final_volume,
-                round_volume_to,
                 is_lessthan_desired_size)
 
             #make csv file
@@ -133,9 +146,6 @@ def aggregate(filenames, incomplete_echopicklists_folder, output_folder, desired
     for dataframe, is_lessthan_desired_size, files_used, left_over_dataframe in dataframes_ofsize:
         formatted_echopick_list = format_echopicklist(
             dataframe,
-            desired_concentration,
-            final_volume,
-            round_volume_to,
             is_lessthan_desired_size)
 
         write_csv_from_dataframe(formatted_echopick_list, plate_num, output_folder, is_lessthan_desired_size)
@@ -194,16 +204,13 @@ def write_csv_from_dataframe(dataframe, plate_num, output_folder, is_incomplete_
 
 def format_echopicklist(
         aggregated,
-        desired_concentration,
-        final_volume,
-        round_volume_to,
         is_incomplete_plate=False):
-    mass = desired_concentration * final_volume
+    mass = DESIRED_CONCENTRATION * FINALVOLUME
     aggregated = aggregated.rename(
      columns={"well": "Source well", 'concentration': 'C(ng/ul)',
               'plate': 'Plate number', 'name': "Name", })
-    aggregated['Desired C'] = desired_concentration
-    aggregated['Final V'] = final_volume
+    aggregated['Desired C'] = DESIRED_CONCENTRATION
+    aggregated['Final V'] = FINALVOLUME
     aggregated["Verdict"] = 1
     aggregated['Type'] = 'Unknown'
 
@@ -213,12 +220,12 @@ def format_echopicklist(
     # In case the sample volume is bigger than the final volume, take
     # the minimum
     aggregated['Sample V'] = aggregated['C(ng/ul)'].map(
-     lambda x: min(mass/x, final_volume))
-    aggregated['Buffer V'] = final_volume - aggregated['Sample V']
+     lambda x: min(mass/x, FINALVOLUME))
+    aggregated['Buffer V'] = FINALVOLUME - aggregated['Sample V']
 
     aggregated['Rounded Sample V'] = aggregated['Sample V'].map(
-     lambda x: round_partial(x, round_volume_to))
-    aggregated['Rounded Buffer V'] = final_volume - \
+     lambda x: round_partial(x, ROUND_VOLUME_TO))
+    aggregated['Rounded Buffer V'] = FINALVOLUME - \
                                   aggregated['Rounded Sample V']
 
     well_names = DESTINATIONS
