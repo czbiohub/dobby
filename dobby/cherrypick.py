@@ -317,6 +317,9 @@ def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
 
     average_blanks = concentrations[blanks_col].mean()
     std_blanks = concentrations[blanks_col].std()
+    # average_blanks = 0.5
+    # std_blanks = 0
+
 
     # Minimum threshold: One standard deviation away from the mean
     avg_std = average_blanks + std_blanks
@@ -328,6 +331,7 @@ def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
         f'oncentration QC')
     good_cells = concentrations[is_cell_good]
 
+    # without_standards_or_blanks = good_cells.loc[:, :(STANDARDS_COL - 1)]
     without_standards_or_blanks = good_cells.loc[:, :(blanks_col - 1)]
 
     if plot:
@@ -418,7 +422,7 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
 
     """
 
-    main(filename, plate_name, mouse_id, output_folder=output_folder, plot=True)
+    main(filename, plate_name, mouse_id, output_folder=output_folder, plot=True, blanksc=blanks_col)
 
 
 def main(filename,
@@ -426,7 +430,7 @@ def main(filename,
          mouse_id,
          filetype='txt',
          standards_col=STANDARDS_COL,
-         blanks_col=BLANKS_COL,
+         blanksc=BLANKS_COL,
          standards=STANDARDS_STR,
          plot=True,
          output_folder='.',
@@ -444,12 +448,12 @@ def main(filename,
         fluorescence, standards_col, standards, output_folder=output_folder,
         inner=inner_standards, r_minimum=r_minimum)
 
-    good_cells = _get_good_cells(concentrations, blanks_col, plate_name,
+    good_cells = _get_good_cells(concentrations, blanksc, plate_name,
                                  mouse_id, output_folder=output_folder,
                                  plot=plot)
 
     output_folder = _adjust_output_if_fail_sanity_check(
-        concentrations, blanks_col, good_cells,
+        concentrations, blanksc, good_cells,
         concentrations_minimum, concentrations_maximum,
         regressed, r_minimum, output_folder, plate_name, mouse_id)
 
