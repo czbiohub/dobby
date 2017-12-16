@@ -322,19 +322,20 @@ def _get_good_cells(concentrations, blanks_col, plate_name, mouse_id,
     avg_std = average_blanks + std_blanks
 
     is_cell_good = concentrations > avg_std
+
     n_good_cells = is_cell_good.sum().sum()
-    print(
-        f'{plate_name} ({mouse_id}) has {n_good_cells} cells passing C'
-        f'oncentration QC')
+    # print(
+    #     f'{plate_name} ({mouse_id}) has {n_good_cells} cells passing C'
+    #     f'oncentration QC')
     good_cells = concentrations[is_cell_good]
 
     without_standards_or_blanks = good_cells.loc[:, :(blanks_col - 1)]
-
     if plot:
         _heatmap(without_standards_or_blanks, plate_name,
                  'concentrations_cherrypicked_no_standards_or_blanks',
                  output_folder)
 
+    #this is where I should also return the concentrations minus the blank
     return without_standards_or_blanks
 
 
@@ -359,11 +360,16 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
     echo_picks['name'] = echo_picks.apply(
         lambda x: '{well}-{plate}-{mouse_id}-1'.format(**x),
         axis=1)
-    csv = _make_pick_list_filename(output_folder, datatype, plate_name)
-    echo_picks.to_csv(csv, index=False)
-    print(f'Wrote {datatype} ECHO pick list to {csv}')
-    return csv
+    filename = _make_pick_list_filename(output_folder, datatype, plate_name)
+    echo_picks.to_csv(filename, index=False)
+    print(f'Wrote {datatype} ECHO pick list to {filename}')
 
+
+def subtract_blank_concentration(concentrations, blanks_col):
+    average_blanks = concentrations[blanks_col].mean()
+    con_minus_blank = concentrations - average_blanks
+    without_standards_or_blanks = con_minus_blank.loc[:, :(blanks_col - 1)]
+    return without_standards_or_blanks
 
 @click.command(short_help="Use 384-well plate reader fluorescence to choose "
                           "only cells with high enough signals")
@@ -392,7 +398,9 @@ def _transform_to_pick_list(good_cells, plate_name, mouse_id, datatype,
 @click.option('--r-minimum', default=R_MINIMUM,
               help='Minimum value of pearson correlation between regression '
                    'and standards lines')
-def cherrypick(filename, plate_name, mouse_id, filetype='txt',
+@click.option('--subtract-blank-concentration-csv', default=False, type=bool,
+              help='This option will generate a csv with the concentration of every cell minus the concentration of the average blanks')
+def cherrypick(filename, plate_name, mouse_id, subtract_blank_concentration_csv, filetype='txt',
                standards_col=STANDARDS_COL, blanks_col=BLANKS_COL,
                standards=STANDARDS_STR,
                plot=True, output_folder='.',
@@ -418,12 +426,13 @@ def cherrypick(filename, plate_name, mouse_id, filetype='txt',
 
     """
 
-    main(filename, plate_name, mouse_id, output_folder=output_folder, plot=True)
+    main(filename, plate_name, mouse_id, subtract_blank_concentration_csv, output_folder=output_folder, plot=True)
 
 
 def main(filename,
          plate_name,
          mouse_id,
+         subtract_blank_concentration_csv,
          filetype='txt',
          standards_col=STANDARDS_COL,
          blanks_col=BLANKS_COL,
@@ -453,8 +462,16 @@ def main(filename,
         concentrations_minimum, concentrations_maximum,
         regressed, r_minimum, output_folder, plate_name, mouse_id)
 
+    if subtract_blank_concentration_csv:
+        print("Option provided to subtract blank concentration from main concentration")
+        cons_minus_blanks = subtract_blank_concentration(concentrations, blanks_col)
+        _transform_to_pick_list(cons_minus_blanks, plate_name, mouse_id,
+                                'minus_blanks', output_folder=output_folder)
+
     picklist_csv = _make_pick_list_filename(output_folder, 'cherrypicked',
                                             plate_name)
+
+
     if os.path.exists(picklist_csv):
         print(f'\t{plate_name} already cherrypicked, skipping ...')
         return
