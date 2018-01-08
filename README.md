@@ -107,6 +107,18 @@ Wrote cherrypicked ECHO pick list to test_output/cherrypicked/MAA000154_echo.csv
 Wrote non_cherrypicked ECHO pick list to test_output/non_cherrypicked/MAA000154_echo.csv
 ```
 
+### Example: Cherrypick with blanks concentration subtracted
+
+The option `--subtract-blank-concentration-csv True` will generate a csv file with the average of the blanks subtracted from all concetrations. This csv file will be in a folder called `minus_blanks`. Here an example usage:
+
+
+```
+$ dobby cherrypick test/data/cherrypick/input/good_plate.txt MAA000154 30_2_M --output-folder output_folder --subtract-blank-concentration-csv True
+```
+
+
+
+
 ### Example: Aggregate
 
 
