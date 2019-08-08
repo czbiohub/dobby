@@ -102,5 +102,4 @@ dependencies:
   - zlib=1.2.11=h01d97ff_1005
   - pip:
     - xlrd==1.2.0
-prefix: /anaconda3/envs/dobby
 
