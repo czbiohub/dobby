@@ -23,7 +23,7 @@ def sanitize(x):
 class Plate():
     merge_columns = ['well', 'row_letter', 'column_number']
 
-    def __init__(self, data, plate, repeat, barcode, formula, measurement_date,
+    def __init__(self, raw_data, plate, repeat, barcode, formula, measurement_date,
                  measured_height, inside_temperature_at_start,
                  inside_temperature_at_end, humidity_at_start, humidity_at_end,
                  ambient_temperature_at_start, ambient_temperature_at_end,
@@ -32,8 +32,8 @@ class Plate():
                  control='DMSO', ignore_edge_rows=True, raw_cmap='RdYlGn',
                  computed_cmap="RdBu"):
 
-            self.raw_data = data
-            self.rawdata_tidy = self.tidify(self.raw_data, value='raw_values')
+            self.raw_data = raw_data
+            self.raw_data_tidy = self.tidify(self.raw_data, value='raw_values')
             self.plate = plate
             self.repeat = repeat
             self.barcode = barcode
@@ -79,7 +79,6 @@ class Plate():
             self.tidy = self.tidy.merge(self.computed_tidy,
                                         on=self.merge_columns)
 
-
     @staticmethod
     def tidify(data2d, value='value'):
         """Convert 2d raw_data matrix to tidy format, each row is 1 observation"""
@@ -92,7 +91,7 @@ class Plate():
 
     def merge_plate_data_and_map(self):
 
-        self.tidy = self.map_tidy.merge(self.rawdata_tidy,
+        self.tidy = self.map_tidy.merge(self.raw_data_tidy,
                                         on=self.merge_columns,
                                         suffixes=['_map', '_data'])
 
